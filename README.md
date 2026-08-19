@@ -52,8 +52,26 @@ uyarısı kayıtlar yayılana kadar normaldir.
 **Ayrıca:** Natro'daki **"Park Sayfası"nı kapat.** Açık kalırsa alan adı
 Vercel yerine park sayfasına gidebilir.
 
-**E-posta etkilenmez:** iletişim adresi Gmail (`roketdijitalmedya@gmail.com`),
-alan adına bağlı bir posta kutusu yok — yani MX kaydı riski taşımıyoruz.
+### 🚨 E-POSTA KAYITLARINA DOKUNMA
+
+Alan adında **kurumsal e-posta kurulu** (`kurumsaleposta.com` üzerinden).
+Aşağıdaki kayıtlar silinir veya değiştirilirse **e-posta çalışmaz**:
+
+| Kayıt | Görevi |
+|---|---|
+| `MX` → `mx-01.kurumsaleposta.com` | Gelen postayı taşır |
+| `MX` → `mx-02.kurumsaleposta.com` | Yedek posta sunucusu |
+| `TXT` → `v=spf1 include:_spfcls.natrohost.com ...` | Giden postanın spam'e düşmemesi |
+| `TXT` `ntr._domainkey` → `v=DKIM1; ...` | Posta imzalama |
+| `CNAME` `autodiscover` → `mail.kurumsaleposta.com` | Outlook/telefon otomatik kurulumu |
+| `SRV` `_autodiscover._tcp` | Aynı iş |
+| `CNAME` `ftp` → `rodimedya.com` | Zararsız, kalabilir |
+
+**Sadece şu üç satır değişecek:**
+1. `A` `rodimedya.com` `85.159.66.93` → **`216.198.79.1`**
+2. `A` `rodimedya.com` `94.73.151.184` → **SİL** (Vercel tek A kaydı ister;
+   ikincisi kalırsa trafiğin bir kısmı eski sunucuya gider)
+3. `CNAME` `www` `redirect.natrocdn.com` → **`63b2e3837687f9c3.vercel-dns-017.com`**
 
 Yayılma genelde 5–30 dakika, en fazla birkaç saat. Vercel SSL sertifikasını
 kayıtları doğruladıktan sonra otomatik üretir.

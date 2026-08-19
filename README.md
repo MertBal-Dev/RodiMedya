@@ -25,21 +25,29 @@ kullanıyor; mevcut hosting "WP Profesyonel".
 **Önerilen yol: DNS'i Natro'da bırak, sadece iki kayıt değiştir.** Nameserver
 değiştirmekten daha düşük riskli ve geri alması kolay.
 
-Natro panelinde **DNS Yönetimi**:
+Natro panelinde **DNS Yönetimi** — bu projenin Vercel panelinden alınan
+gerçek değerleri:
 
 | Tip | Ad | Değer | TTL |
 |---|---|---|---|
-| A | `@` | `76.76.21.21` | 3600 |
-| CNAME | `www` | `cname.vercel-dns-0.com` | 3600 |
+| A | `@` | `216.198.79.1` | 3600 |
+| CNAME | `www` | `63b2e3837687f9c3.vercel-dns-017.com` | 3600 |
 
 Varsa eski `A @` ve `CNAME www` kayıtlarını **sil** (WordPress hosting'e
 bakıyorlar), yenilerini ekle.
 
-> ⚠️ **Kesin değerleri Vercel panelinden al.** Yukarıdakiler genel değerlerdir;
-> Vercel projeye özel değer gösterebiliyor ve CNAME adresi geçmişte değişti
-> (`cname.vercel-dns.com` → `cname.vercel-dns-0.com`). Vercel'de
-> **Project → Settings → Domains → Add** dediğinde ekranda tam olarak hangi
-> kaydı gireceğini yazıyor — onu esas al.
+> ⚠️ **Bu değerler PROJEYE ÖZEL.** Vercel'in genel dokümantasyonundaki
+> `76.76.21.21` ve `cname.vercel-dns-0.com` bu proje için geçerli değil —
+> Vercel her projeye ayrı IP ve ayrı CNAME hostu atıyor. Değerler
+> **Project → Settings → Domains** ekranında yazıyor; başka bir yerden
+> kopyalama.
+
+> **Sondaki nokta:** Vercel CNAME'i `...vercel-dns-017.com.` diye gösterir.
+> Sondaki nokta FQDN işaretidir; Natro paneli genelde kendisi ekler, o yüzden
+> **noktasız** gir. Panel hata verirse noktalı halini dene.
+
+Kayıtları girdikten sonra Vercel'de **Refresh**'e bas. "Invalid Configuration"
+uyarısı kayıtlar yayılana kadar normaldir.
 
 **Ayrıca:** Natro'daki **"Park Sayfası"nı kapat.** Açık kalırsa alan adı
 Vercel yerine park sayfasına gidebilir.

@@ -1,0 +1,3308 @@
+Build a premium GSAP + WebGL "creative developer portfolio" — a cinematic scroll site as a Next.js App Router app. Reproduce the implementation EXACTLY. Do not invent features, do not redesign, do not "improve" values. The prose (PART A) explains intent so you never paraphrase the load-bearing logic; PART B lists the exact bugs that appear when you DO paraphrase — avoid them; PART C is the verbatim source you must reproduce (Hero.tsx + HeroCircularGallery.tsx are the heart of the project — reproduce them value-for-value); PART D is run + verify. If a value appears here, use it. If a behaviour appears here, implement it.
+
+#######################################################################
+PART A — SPEC
+#######################################################################
+
+=== 1. PROJECT GOAL ===
+A single-page portfolio for Yildiz Dikme (Creative Developer / Technology Creator). It opens as a cinematic aviation sequence and then becomes a normal, usable site.
+
+The visitor lands on a dark cabin wall with a small aeroplane window in the centre. Scrolling enlarges that window until the frame leaves the viewport and the visitor has passed THROUGH it into a full-screen cloud field. A WebGL circular gallery of work then rises from below the viewport into the upper band of the screen, stays there, keeps advancing as the page scrolls, and can be dragged left/right with the mouse. The hero's editorial statement enters underneath it. The hero then unpins into a second pinned scene where a 3D business jet flies up through the frame while the background fades from pale blue to near-black. Below that, three quiet editorial sections on that same near-black surface — services, a project enquiry brief, and a community/membership presentation — and finally a dark footer with an interactive globe.
+
+Two visual registers, one codebase:
+- CINEMATIC (pinned, scroll-scrubbed): the aperture hero and the jet outro. Cold blue-white palette, display serif, no UI chrome.
+- FUNCTIONAL (normal document flow): services / enquiry / community / footer. Near-black surface, hairline rules, the same serif at smaller sizes. No cards, no panels, no shadows.
+
+Responsive at 900px (isMobile = matchMedia("(max-width: 900px)")) plus CSS breakpoints at 1000px, 900px, 700px, 600px.
+
+=== 2. TECH STACK (strict) ===
+- Next.js 16.1.6 (App Router, Turbopack) + React 19.2.3 + TypeScript. Tailwind CSS 3.4 is installed and used ONLY by GlobalFooter and the globe; every other component uses plain scoped CSS classes defined in app/globals.css.
+- GSAP 3.14+ with the ScrollTrigger plugin — all scroll animation.
+- Lenis 1.3+ — smooth scrolling, instantiated ONCE inside Hero.tsx and wired to ScrollTrigger via `lenis.on("scroll", ScrollTrigger.update)` plus `gsap.ticker.add(raf)` and `gsap.ticker.lagSmoothing(0)`.
+- @react-three/fiber + @react-three/drei + three — the jet scene only.
+- ogl — the circular gallery only (React Bits CircularGallery, WebGL via OGL, NOT three).
+- cobe — the footer globe.
+- ALL scroll animation is imperative: one ScrollTrigger per pinned section, values written with `gsap.set` inside `onUpdate`. NO React state drives animation. The gallery is driven through an imperative handle (`useImperativeHandle`), never through props that change per frame.
+- Assets are LOCAL, served from Next's `public/` folder. No remote images, no CDN models, no icon libraries. Two Google Fonts are imported by CSS `@import` (Instrument Serif, Oswald).
+- Dev server: `npm run dev` (port 3000).
+
+=== 3. FILE STRUCTURE ===
+next.config.ts        (empty config object)
+tsconfig.json         (Next default, paths: { "@/*": ["./*"] })
+tailwind.config.js
+postcss.config.js
+components.json       (shadcn config; registries include @react-bits)
+package.json
+public/
+  sky.jpg             ~3.0 MB  cloud plate, tall portrait crop
+  sky2.jpg            ~0.7 MB  dark moon-over-cloud plate
+  window.png          ~3.3 MB  aeroplane window plate, 2400x1350, GLASS AREA FULLY TRANSPARENT (alpha 0)
+  models/business-jet.glb   ~6.3 MB  business jet model
+  media/asteroid/still-desktop.webp    1600x900  bloomed asteroid still
+  media/asteroid/poster-desktop.webp   1600x900  pre-bloom asteroid still
+  media/asteroid/still-mobile.webp      960x540
+  media/asteroid/poster-mobile.webp     960x540
+app/
+  layout.tsx              root layout + metadata + the scroll-restoration head script
+  page.tsx                Loader / Hero / PlaneOutro / Services / StartProject / Community / GlobalFooter
+  globals.css             ALL layout + design system (1124 lines) — load-bearing
+  Loader.tsx              entry cover, holds until sky.jpg + window.png decode
+  Hero.tsx                THE ENGINE — Lenis + the pinned aperture timeline
+  HeroCircularGallery.tsx THE BRIDGE — maps hero progress onto the gallery
+  PlaneOutro.tsx          pinned R3F jet scene
+  Services.tsx            editorial numbered index
+  StartProject.tsx        enquiry brief (frontend only)
+  Community.tsx           membership presentation (frontend only)
+  GlobalFooter.tsx        dark footer + cobe globe (Tailwind)
+components/
+  CircularGallery.tsx     vendored React Bits component, locally adapted (see PART C.13)
+  CircularGallery.css     15 lines, ships with the component
+  ui/globe.tsx            cobe wrapper used by the footer
+lib/utils.ts              cn() helper (clsx + tailwind-merge)
+
+Do NOT create app/BackgroundTransition.tsx (it exists in the original repo but is imported nowhere — dead code, leave it out).
+
+=== 4. REQUIRED ASSETS — WHERE THEY COME FROM ===
+EVERY image and the 3D model already live in the project's `public/` folder. DO NOT download anything, DO NOT generate placeholders, DO NOT substitute stock photography. Look inside `public/` and use exactly these paths:
+
+  /sky.jpg                              -> the hero cloud background (`.sky-container img`)
+  /window.png                           -> the aeroplane window plate (`.window-container img`)
+  /sky2.jpg                             -> gallery card "Placeholder — Horizon"
+  /media/asteroid/still-desktop.webp    -> gallery card "Asteroid Bloom"
+  /media/asteroid/poster-desktop.webp   -> gallery card "Placeholder — Pre-Bloom"
+  /models/business-jet.glb              -> the jet, loaded with useGLTF("/models/business-jet.glb")
+
+If a file is missing, DO NOT invent a replacement — report which path is absent and keep building. Two hard constraints on assets:
+  (a) window.png MUST have a fully transparent glass area (alpha 0 in the centre). The whole aperture illusion depends on the gallery and clouds showing through it at scale 4.
+  (b) Gallery images MUST be fully opaque. The gallery shader samples the texture directly with no alpha compositing, so a transparent PNG (e.g. /window.png) renders as a solid BLACK rectangle. Never put window.png in the gallery item list.
+
+=== 5. DESIGN TOKENS ===
+:root
+  --light          #fff
+  --dark           #0f0f0f
+  --plane-bg       #cfe6ea      (the jet scene's pale blue)
+  --plane-text-color #0f0f0f    (animated to rgb(255,255,255) by PlaneOutro's onUpdate)
+Dark functional surface: #0b0b0c   (jet scene fades to it; footer and all three editorial sections use it)
+Hairline rule: rgba(255,255,255,0.12)
+Gallery card caption colour: #12212a
+
+Fonts (CSS @import, in this order, at the very top of globals.css):
+  Instrument Serif (ital 0;1)  -> body font, everything
+  Oswald (600;700)             -> imported but not applied anywhere; keep the import
+
+Global type scale (these are GLOBAL element selectors — they cascade into every new section, which is why the functional sections all set their own sizes):
+  body   font-family "Instrument Serif", sans-serif ; color var(--dark)
+  h1     font-size clamp(5rem, 6vw, 7rem) ; weight 500 ; line-height 0.8
+  p      font-size 1.35rem ; line-height 1
+  img    width 100% ; height 100% ; object-fit cover ; display block
+  section  position relative ; width 100vw ; height 100svh ; overflow hidden
+  @media (max-width:1000px)  h1 -> 3rem ; p -> 1.125rem
+
+Micro-label pattern used by every functional section:
+  font-size 0.72–0.78rem ; letter-spacing 0.16–0.24em ; text-transform uppercase ; low-opacity white
+
+=== 6. PAGE ORDER (do not reorder) ===
+  <Loader />        fixed cover, unmounts itself
+  <Hero />          pinned 5 viewports  — aperture + circular gallery + editorial statement
+  <PlaneOutro />    pinned +=180%       — R3F jet, background fades to #0b0b0c
+  <Services />      normal flow         — id="services"
+  <StartProject />  normal flow         — id="start"
+  <Community />     normal flow         — id="community"
+  <GlobalFooter />  normal flow         — id="global"
+The footer's existing nav anchors (#services, #community) resolve against those ids.
+
+=== 7. THE HERO — EXACT GEOMETRY AND TIMELINE (load-bearing) ===
+DOM order inside `<section className="hero">` matters for BOTH paint order and hit-testing:
+  1. .hero-fade          bottom gradient into the jet scene, z-index 999, pointer-events none
+  2. .sky-container      position RELATIVE (not absolute), height 350svh — the scrolling cloud plate
+  3. .hero-gallery       the WebGL gallery overlay, z-index 0
+  4. .hero-copy          the editorial statement
+  5. .window-container   the window plate, height 100svh
+  6. .hero-header        name + positioning type, height 100svh, transform-style preserve-3d
+`.hero` itself carries `perspective: 1000px` and `isolation: isolate`.
+
+The gallery is placed BEFORE .hero-copy and given `z-index: 0` (not a positive value) so the copy always paints on top of it. It is placed BEFORE .window-container so the window plate paints over it — which is correct, because the glass is transparent and the frame then reads as framing the gallery during the reveal.
+
+ONE ScrollTrigger:
+  trigger .hero ; start "top top" ; end () => `+=${window.innerHeight * 5}px`
+  pin true ; pinSpacing true ; scrub 1 ; invalidateOnRefresh true
+`end` MUST be a function, not a template string. A static string is not recomputed on refresh, so resizing the window leaves the pin distance measured against the old viewport.
+
+Constants:
+  PIN_VIEWPORTS 5 ; APERTURE_VIEWPORTS 3 ; APERTURE_SCALE = 5/3
+  COPY_START 0.78 ; FADE_START 0.78 ; FADE_SPAN 0.12
+
+onUpdate(progress) writes five things:
+  ap          = min(1, progress * 5/3)          // the original 3-viewport curve, replayed over the first 3 of 5
+  windowScale = ap <= 0.5 ? 1 + (ap/0.5)*3 : 4  // 1 -> 4, complete at progress 0.30
+  .window-container  scale windowScale
+  .hero-header       scale windowScale, z ap*500     (flies past the camera through the 1000px perspective)
+  .sky-container     y -progress * (skyHeight - innerHeight)   // NOTE: raw progress, not ap — the clouds keep drifting behind the gallery instead of freezing at 0.60
+  .hero-copy         yPercent 100 until 0.78, then linear to 0 at 1.0
+  .hero-fade         opacity clamp01((progress - 0.78) / 0.12)
+  gallery handle     update(progress)
+
+Why the ap remap exists: the pin was originally 3 viewports. Making it 5 gave the gallery room to be explored. Driving the window off `ap` replays the ORIGINAL curve over the first 3 viewports of the longer pin — identical scale, identical perspective, identical rate of travel in absolute scroll pixels — then holds at 4. Do not "simplify" this to raw progress; it changes the aperture's speed.
+
+Before-anything-else in the same effect, immediately after `new Lenis()`:
+  lenis.scrollTo(0, { immediate: true, force: true })  — once, then once more inside requestAnimationFrame
+This is a reload guard, explained in PART B BUG 1.
+
+Cleanup MUST cancel that rAF, `ctx.revert()`, `gsap.ticker.remove(raf)` and `lenis.destroy()`.
+
+=== 8. THE CIRCULAR GALLERY BRIDGE (HeroCircularGallery.tsx) ===
+This is NOT a page section. It is an overlay inside the pinned hero, and it owns NO ScrollTrigger. Hero calls `update(progress)` every scroll frame through an imperative handle.
+
+Constants:
+  ENTER_START 0.30      // aperture just finished; gallery still entirely BELOW the viewport
+  ENTER_END   0.48      // fully in place
+  ITEMS_TRAVELLED 5     // item-widths the vertical scroll advances after it lands
+  DPR_DESKTOP 1.5 ; DPR_MOBILE 1
+
+update(progress):
+  slide = clamp01((progress - 0.30) / (0.48 - 0.30))
+  wrapper.style.transform  = `translateY(${(1 - slide) * 100}svh)`   // POSITION ONLY
+  wrapper.style.visibility = progress >= 0.30 ? "visible" : "hidden" // written only on change
+  wrapper.style.pointerEvents = slide >= 1 ? "auto" : "none"
+  if (visible && !reducedMotion):
+    travel = clamp01((progress - 0.48) / (1 - 0.48))
+    api.setScrollBase(travel * 5 * api.getItemWidth())
+
+NON-NEGOTIABLE behaviours:
+  - Opacity is 1 at ALL times and is NEVER animated. There is no fade-in and no fade-out.
+  - There is no exit. Once revealed the gallery stays for the rest of the hero and leaves only when the hero itself unpins.
+  - The entrance is a slide from fully below the viewport, exactly like .hero-copy — never a "pop" in the middle of the cloud scene.
+  - The wrapper's CSS has `transition: none !important`. The visibility switch must never be interpolated.
+  - The wrapper is anchored to the TOP of the viewport (`justify-content: flex-start` + `padding-top: calc(3svh + 33px)`), NOT centred. `.hero-copy` is a vertically centred block, so the only way to keep real clearance above it is to pin the gallery to the upper band. Measured clearance at a 1100px viewport: 207px.
+  - The 33px in that padding compensates for a "SELECTED WORK" label that used to sit above the stage; it was removed and the padding keeps the cards at exactly the same height.
+  - The renderer is mounted on the FIRST client render, not lazily. Nothing whatsoever is created once the visitor starts scrolling.
+  - The gallery images are requested and `decode()`d in a mount effect, so they load behind the Loader.
+  - `update()` touches inline styles and the imperative API only. It NEVER calls a React state setter — a setState per scroll frame is what caused a visible hitch during the aperture.
+
+Gallery items (4 records, in this order):
+  { image: "/media/asteroid/still-desktop.webp",  text: "Asteroid Bloom" }
+  { image: "/sky.jpg",                            text: "Placeholder — Sky Study" }
+  { image: "/media/asteroid/poster-desktop.webp", text: "Placeholder — Pre-Bloom" }
+  { image: "/sky2.jpg",                           text: "Placeholder — Horizon" }
+Only "Asteroid Bloom" is real work; the other three are explicitly labelled placeholders in the source and must stay labelled.
+
+CircularGallery props as used here:
+  bend {isMobile ? 2 : 3} ; textColor "#12212a" ; borderRadius 0.03 ; scrollEase 0.06
+  dpr {isMobile ? 1 : 1.5} ; captureWheel={false} ; capturePointer ; apiRef
+
+`prefers-reduced-motion: reduce` swaps the whole WebGL canvas for `.hero-gallery-static` — three plain <img> figures with captions, in the same place, no canvas mounted at all, and no image bytes requested for the animated path.
+
+=== 9. THE JET SCENE (PlaneOutro.tsx) ===
+R3F Canvas, `dpr={[1, 1.5]}`, one ambientLight (1.1) and two directionalLights (2.2 at [6,10,8], 1.0 at [-6,8,6]).
+Model normalisation, in this order, or production and dev diverge:
+  clone the loaded scene ; rotation.set(-PI/2, 0, PI) ; updateMatrixWorld(true)
+  measure Box3 -> size ; maxDim = max(x,y,z) ; TARGET 10 ; normalizeScale = TARGET / maxDim
+  scale.setScalar(normalizeScale * (isMobile ? 0.75 : 0.9))
+Camera: desktop position [0, 4.4, 15] fov 28 ; mobile [0, 5.2, 26] fov 42. isMobile here is `matchMedia("(max-width: 900px)")`.
+BASE_Y 6.2 ; START_OFFSET -18 ; END_OFFSET +12.
+ScrollTrigger: trigger the section, start "top top", end "+=180%", pin, pinSpacing, anticipatePin 1, invalidateOnRefresh.
+The effect is gated on `isPlaneReady` — it must not build the timeline before the GLB has resolved.
+Motion is smoothed with `gsap.quickTo`, not per-frame tweens:
+  plane.position.y   duration 0.9  power3.out
+  left/right text y  duration 0.6  power3.out ; opacity duration 0.6 power2.out
+  background fade    duration 0.35 power2.out
+onUpdate(p):
+  plane y   interpolate(BASE_Y-18, BASE_Y+12, p)
+  left text  reveal over clamp01((p-0.08)/0.2)  — y 80 -> 0, opacity 0 -> 1
+  right text reveal over clamp01((p-0.12)/0.2)
+  bg overlay opacity clamp01((p-0.72)/0.28)     — fades to #0b0b0c
+  --plane-text-color from rgb(15,15,15) to rgb(255,255,255) over clamp01((p-0.78)/0.22)
+Captions: left "Creative" + "Digital work that moves with intent" ; right "Technology".
+`useGLTF.preload("/models/business-jet.glb")` sits at module scope, after the component.
+
+=== 10. THE LOADER ===
+Holds the page behind a fixed cover in the site's own palette until BOTH /sky.jpg and /window.png have `decode()`d (not merely fetched), with a 6000 ms hard ceiling. Then it fades over 0.8s and unmounts 900 ms later, leaving nothing in the DOM.
+It renders: "Yıldız Dikme" / "Creative Developer" / a 1px progress rule that scaleX-es from 0 to 1.
+It MUST NOT set `overflow: hidden` on the document. Making the page unscrollable collapses ScrollTrigger's pin distance to zero and leaves the hero frozen at the end of its timeline on first paint. The cover is fixed and full-screen; nothing needs locking.
+Its layout effect also sets `history.scrollRestoration = "manual"` and scrolls to 0 — belt and braces behind the head script.
+
+=== 11. THE FUNCTIONAL SECTIONS ===
+All three sit on #0b0b0c, override the global `section { height:100svh; overflow:hidden }` with `height:auto; min-height:0; overflow:visible`, and share `.editorial*` primitives: a max-width 1400px inner, an uppercase micro-label, a display-serif title at clamp(2.6rem,5.4vw,5rem)/0.88, a 60%-white lede, and hairline rules.
+
+Services (id="services") — a numbered editorial index, NOT a card grid. Five rows: 01–05, each `3.5rem | 1fr | 15rem` on desktop, collapsing to `2.6rem | 1fr` under 1000px with the tags dropping to the second column. Titles: Creative Web Development / Full-Stack Product Development / Interactive 3D Experiences / AI Product Prototyping / Technology Content & Collaborations.
+
+StartProject (id="start") — a written brief. Six fields (name, email, company, project type, estimated budget, about the project) on hairline underlines, two columns collapsing to one under 700px, `appearance: none` on the selects with their `option`s forced back to dark-on-white so the OS popup stays legible. FRONTEND ONLY: `onSubmit` calls `preventDefault()` and flips a local flag; the note then reads "Nothing was sent — this form is not connected to a backend yet." Do not fake a success state, and do not add a backend.
+
+Community (id="community") — two tiers (Open / Free, Studio / Premium) as ruled rows, NOT pricing cards; a members-only preview list of three titled rows; "Join the community" and "Log in" as INERT `<button type="button">` with the note "Membership opens soon." No auth, no database, no payments.
+
+=== 12. RESPONSIVE / NON-NEGOTIABLES ===
+- The aperture, the jet scene and their constants are fixed. Do not retune them.
+- Flat pinned scroll-scrub only. Never convert a pinned scene into a normal section or vice versa.
+- No React state anywhere in a scroll path.
+- One Lenis instance, created in Hero. If routes are ever added it must move to a layout-level provider — but in this build it stays in Hero.
+- Exactly THREE WebGL contexts on the page: the gallery (OGL), the jet (three/R3F), the globe (cobe). Never mount a fourth, never mount any of them twice.
+- `.hero-copy`, `.window-container` and `.hero-header` MUST have `pointer-events: none` (see PART B BUG 2).
+- Every functional section must override the global `section` height/overflow or its content is clipped to one viewport.
+
+#######################################################################
+PART B — COMMON REPRODUCTION FAILURES (the exact bugs to avoid)
+#######################################################################
+
+Every bug below was hit and fixed during the original build. They are listed in the order they cost the most time.
+
+BUG 1 — ON RELOAD THE HERO OPENS ALREADY ZOOMED (window huge, no header type).
+Cause: the browser restores the previous scroll offset on refresh, so the pinned hero starts part-way through its timeline. Three partial fixes that are NOT enough on their own:
+  (a) `history.scrollRestoration = "manual"` inside a React effect — too late. Chrome RETRIES the restore as the document grows, and this page grows twice after hydration (the pin spacers, then PlaneOutro's pin once its 6 MB GLB resolves). The late retry lands after any reset a component performed.
+  (b) `window.scrollTo(0, 0)` once Lenis is running — Lenis writes its own position back to the document every frame, so the reset is overwritten on the next tick.
+  (c) locking the page with `overflow: hidden` while a loader is up — this collapses ScrollTrigger's pin distance to ZERO, which is a worse version of the same symptom (the hero freezes at the END of its timeline).
+FIX, all three layers:
+  1. An inline script in `<head>` (layout.tsx, via dangerouslySetInnerHTML) that runs BEFORE the body is parsed:
+       try{history.scrollRestoration='manual';window.scrollTo(0,0)}catch(e){}
+     This stops the restore from ever starting rather than trying to undo it.
+  2. In Hero, immediately after `new Lenis()`: `lenis.scrollTo(0, { immediate: true, force: true })`, once synchronously and once inside `requestAnimationFrame`. The reset must go through Lenis, not the window.
+  3. The Loader's layout effect repeats step 1 as a safety net, and does NOT lock scrolling.
+VERIFY: set `history.scrollRestoration='auto'`, scroll to ~2600px, reload, then WAIT 2.5 s (so the GLB resolves and the late retry would fire). Expect scrollY 0 and window scale 1.
+
+BUG 2 — THE GALLERY CANNOT BE CLICKED OR DRAGGED WITH A REAL MOUSE (yet synthetic events "work").
+Cause: `.window-container` and `.hero-header` are full-viewport absolutely-positioned layers with the default `pointer-events: auto`. Real mouse events hit-test against them first and never reach the gallery canvas underneath. A synthetic `PointerEvent` dispatched directly onto the canvas bypasses hit-testing entirely, so a naive test reports success while the real pointer is blocked.
+FIX: `.hero-copy, .window-container, .hero-header { pointer-events: none }`. All three are purely decorative — no links, no controls — so nothing on screen changes.
+VERIFY with hit-testing, not synthetic events:
+  document.elementsFromPoint(cx, cy)   // must start with CANVAS, then .circular-gallery, then .hero-gallery-stage
+If you see `.hero-header` or `.window-container` first, the fix is not applied.
+
+BUG 3 — A FRAME HITCH WHILE PASSING THROUGH THE WINDOW.
+Cause: lazily mounting the gallery during the aperture scroll — creating the OGL canvas, compiling shaders, decoding images and uploading textures at the worst possible moment — and/or calling a React state setter from inside ScrollTrigger's `onUpdate`.
+FIX: mount CircularGallery on the FIRST client render, invisible and parked below the viewport; `decode()` its images in a mount effect; drive everything afterwards through the imperative handle so no React reconciliation happens during scroll.
+VERIFY: at scroll 0, `document.querySelectorAll('.hero-gallery-stage canvas').length === 1` and the gallery images already appear in `performance.getEntriesByType('resource')`. Then confirm ZERO new canvases and ZERO new resources appear as progress crosses the reveal threshold.
+
+BUG 4 — A GALLERY CARD RENDERS AS A SOLID BLACK RECTANGLE.
+Cause: a transparent PNG in the item list. The gallery's fragment shader samples the texture directly with no alpha compositing.
+FIX: gallery images must be fully opaque. Never use /window.png as a card.
+
+BUG 5 — THE APERTURE'S PIN DISTANCE IS WRONG AFTER A WINDOW RESIZE.
+Cause: `end: \`+=${window.innerHeight * 5}px\`` as a static template string. It is evaluated once; `invalidateOnRefresh` does not recompute a literal.
+FIX: `end: () => \`+=${window.innerHeight * 5}px\`` — a function IS re-evaluated on refresh.
+
+BUG 6 — THE GALLERY SNAPS BACK TO THE SCROLL POSITION THE MOMENT YOU STOP DRAGGING.
+Cause: the host writing straight to the gallery's internal `scroll.target`, so every scroll frame overwrites the user's drag.
+FIX: split the target into two independent contributions inside the component —
+  target = scrollBase + dragOffset
+The host writes ONLY `scrollBase` (via `setScrollBase`). Pointer drags accumulate into `dragOffset` and are never touched by a host update. The release snap (`onCheck`) must also adjust `dragOffset`, never `scrollBase`.
+
+BUG 7 — SCROLLING ANYWHERE ON THE PAGE SPINS THE GALLERY.
+Cause: React Bits' CircularGallery attaches `wheel`/`mousewheel` listeners to `window`.
+FIX: pass `captureWheel={false}`. Keep `capturePointer` so click-and-drag still works.
+
+BUG 8 — TOUCH DRAG HIJACKS VERTICAL PAGE SCROLLING ON MOBILE.
+Cause: claiming every touch pointer as a horizontal drag.
+FIX: on a touch pointer, wait for an 8px movement threshold and only claim the gesture when |dx| > |dy|; otherwise release the pointer and let the page scroll. Never call `preventDefault()` on a vertical gesture. `.hero-gallery-stage` also sets `touch-action: pan-y`.
+
+BUG 9 — A NEW SECTION IS CLIPPED TO EXACTLY ONE VIEWPORT.
+Cause: the GLOBAL rule `section { height: 100svh; overflow: hidden }`. Every `<section>` inherits it.
+FIX: every functional section sets `height: auto; min-height: 0; overflow: visible`. The global `h1` clamp cascades too — that is why every new section declares its own type sizes.
+
+BUG 10 — THE GALLERY IS PINNED AT THE WRONG SCROLL POSITION (an earlier architecture).
+Cause (historical, worth knowing): when a pinned section is created while other pinned sections above it have not registered yet, it measures its start against the wrong layout. PlaneOutro registers late because it waits for its GLB.
+FIX in the current architecture: the gallery owns NO ScrollTrigger at all — it is driven by Hero's. If you ever add another pinned section below PlaneOutro, it needs `refreshPriority: -1` so it re-measures last.
+
+BUG 11 — THE HERO COPY AND THE GALLERY OVERLAP UNREADABLY.
+Cause: `.hero-copy` is `height:100svh; align-items:center`, i.e. a vertically centred block ~45svh tall. Centring the gallery too makes overlap mathematically unavoidable.
+FIX, both halves: anchor the gallery to the TOP (`justify-content: flex-start`, `padding-top: calc(3svh + 33px)`, stage height `min(42svh, 380px)`), AND move the copy to the lower band (`.hero-copy { align-items: flex-end; padding-bottom: 6svh }`). Typography, size and the yPercent entry animation are untouched — only the resting position moves. Also give `.hero-gallery` `z-index: 0` (NOT a positive value) so the copy, a later z-auto sibling, still paints on top.
+
+BUG 12 — DEV-ONLY: EFFECTS DOUBLE-FIRE AND LEAK.
+Cause: React StrictMode double-invokes effects.
+FIX: every effect returns a full cleanup — `ctx.revert()`, `gsap.ticker.remove(raf)`, `lenis.destroy()`, `cancelAnimationFrame`, `ScrollTrigger` kill via the gsap context, media-query listener removal, and the gallery's own `app.destroy()` which releases pointer capture, removes every listener and detaches its canvas.
+
+#######################################################################
+PART C — EXACT FILES (reproduce verbatim)
+#######################################################################
+
+Hero.tsx and HeroCircularGallery.tsx are the load-bearing engine — reproduce them value-for-value. globals.css is load-bearing layout — reproduce it exactly; its ordering matters because later rules deliberately override earlier ones.
+
+ONE EXCEPTION, and it is deliberate: components/CircularGallery.tsx is a 1009-line VENDORED component from React Bits. Pasting a thousand lines of third-party code here would be less reproducible than the install command plus the exact patch list, because the command guarantees the correct upstream baseline. Its section (C.13) therefore gives the command and every local modification, precisely. Everything else in PART C is verbatim.
+
+──────── C.1  package.json  (dependency block — versions are load-bearing) ────────
+{
+  "name": "jeskojets-next",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cobe": "^0.6.5",
+    "gsap": "^3.14.2",
+    "lenis": "^1.3.17",
+    "lucide-react": "^0.564.0",
+    "motion": "^12.34.0",
+    "next": "16.1.6",
+    "ogl": "^1.0.11",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "tailwind-merge": "^3.4.0",
+    "tailwindcss-animate": "^1.0.7",
+    "three": "^0.182.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.24",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5"
+  }
+}
+
+──────── C.2  next.config.ts ────────
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  /* config options here */
+};
+
+export default nextConfig;
+
+──────── C.3  postcss.config.js ────────
+module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+
+──────── C.4  tailwind.config.js ────────
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+    darkMode: ["class"],
+    content: [
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+  	extend: {
+  		borderRadius: {
+  			lg: 'var(--radius)',
+  			md: 'calc(var(--radius) - 2px)',
+  			sm: 'calc(var(--radius) - 4px)'
+  		},
+  		colors: {
+  			background: 'hsl(var(--background))',
+  			foreground: 'hsl(var(--foreground))',
+  			card: {
+  				DEFAULT: 'hsl(var(--card))',
+  				foreground: 'hsl(var(--card-foreground))'
+  			},
+  			popover: {
+  				DEFAULT: 'hsl(var(--popover))',
+  				foreground: 'hsl(var(--popover-foreground))'
+  			},
+  			primary: {
+  				DEFAULT: 'hsl(var(--primary))',
+  				foreground: 'hsl(var(--primary-foreground))'
+  			},
+  			secondary: {
+  				DEFAULT: 'hsl(var(--secondary))',
+  				foreground: 'hsl(var(--secondary-foreground))'
+  			},
+  			muted: {
+  				DEFAULT: 'hsl(var(--muted))',
+  				foreground: 'hsl(var(--muted-foreground))'
+  			},
+  			accent: {
+  				DEFAULT: 'hsl(var(--accent))',
+  				foreground: 'hsl(var(--accent-foreground))'
+  			},
+  			destructive: {
+  				DEFAULT: 'hsl(var(--destructive))',
+  				foreground: 'hsl(var(--destructive-foreground))'
+  			},
+  			border: 'hsl(var(--border))',
+  			input: 'hsl(var(--input))',
+  			ring: 'hsl(var(--ring))',
+  			chart: {
+  				'1': 'hsl(var(--chart-1))',
+  				'2': 'hsl(var(--chart-2))',
+  				'3': 'hsl(var(--chart-3))',
+  				'4': 'hsl(var(--chart-4))',
+  				'5': 'hsl(var(--chart-5))'
+  			}
+  		}
+  	}
+  },
+  plugins: [require("tailwindcss-animate")],
+};
+
+──────── C.5  components.json ────────
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "tailwind.config.js",
+    "css": "app/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "rtl": false,
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "registries": {
+    "@magicui": "https://magicui.design/r/{name}",
+    "@react-bits": "https://reactbits.dev/r/{name}.json"
+  }
+}
+
+──────── C.6  lib/utils.ts ────────
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
+──────── C.7  app/layout.tsx ────────
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "Yıldız Dikme — Creative Developer",
+  description:
+    "Creative developer and technology creator. Interactive web experiences, full-stack products, and AI-driven interfaces.",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en">
+      <head>
+        {/*
+          Runs before the document body is parsed, which is the only moment
+          early enough to stop the browser restoring a scroll offset on reload.
+          Doing it from React was too late: Chrome retries the restore as the
+          document grows, and this page grows twice after hydration (the pin
+          spacers, then PlaneOutro's pin once its GLB resolves), so the restore
+          landed after any reset the components performed and the hero opened
+          part-way through its timeline with the window already enlarged.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{history.scrollRestoration='manual';window.scrollTo(0,0)}catch(e){}",
+          }}
+        />
+      </head>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        {children}
+      </body>
+    </html>
+  );
+}
+
+──────── C.8  app/page.tsx ────────
+import Loader from "./Loader";
+import Hero from "./Hero";
+import PlaneOutro from "./PlaneOutro";
+import Services from "./Services";
+import StartProject from "./StartProject";
+import Community from "./Community";
+import GlobalFooter from "./GlobalFooter";
+
+export default function Page() {
+  return (
+    <>
+      <Loader />
+      <Hero />
+      <PlaneOutro />
+      <Services />
+      <StartProject />
+      <Community />
+      <GlobalFooter />
+    </>
+  );
+}
+
+──────── C.9  app/Loader.tsx ────────
+"use client";
+
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+
+/**
+ * Layout effect on the client, plain effect on the server render. This has to
+ * run before Hero's own layout effect creates Lenis, which is why it cannot be
+ * a regular useEffect.
+ */
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+/**
+ * Entry loader.
+ *
+ * The hero opens on two large plates (`sky.jpg` ~3 MB, `window.png` ~3.3 MB).
+ * Until both are decoded the aperture cannot animate smoothly, so the page is
+ * held behind a quiet cover in the site's own cold blue-white palette and its
+ * own serif. It also gives the gallery's idle warm-up a moment to run.
+ *
+ * The loader is the one place a fade is wanted — it fades itself out and then
+ * unmounts, leaving nothing behind.
+ */
+
+/** Blocking assets: the two plates the first frame of the hero depends on. */
+const CRITICAL = ["/sky.jpg", "/window.png"];
+
+/** Never hold the page longer than this, however slow the network is. */
+const MAX_HOLD_MS = 6000;
+
+export default function Loader() {
+  const [progress, setProgress] = useState(0);
+  const [done, setDone] = useState(false);
+  const [gone, setGone] = useState(false);
+  const doneRef = useRef(false);
+
+  // A reload must always start the cinematic from the very beginning.
+  //
+  // Browsers restore the previous scroll position on refresh, which lands the
+  // hero part-way through its pinned timeline — the window opens already
+  // enlarged. Turning restoration off and resetting to the top has to happen
+  // before Lenis is constructed in Hero's layout effect, otherwise Lenis
+  // initialises at the restored offset.
+  useIsomorphicLayoutEffect(() => {
+    if ("scrollRestoration" in history) {
+      history.scrollRestoration = "manual";
+    }
+    window.scrollTo(0, 0);
+  }, []);
+
+  // Belt and braces: if anything restored the offset while assets were still
+  // loading, put it back before the cover comes off.
+  useEffect(() => {
+    if (!done) return;
+    window.scrollTo(0, 0);
+  }, [done]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let loaded = 0;
+
+    const finish = () => {
+      if (doneRef.current || cancelled) return;
+      doneRef.current = true;
+      setProgress(1);
+      setDone(true);
+    };
+
+    const bump = () => {
+      loaded += 1;
+      if (cancelled) return;
+      setProgress(loaded / CRITICAL.length);
+      if (loaded >= CRITICAL.length) finish();
+    };
+
+    CRITICAL.forEach((src) => {
+      const img = new Image();
+      img.decoding = "async";
+      img.src = src;
+      // decode() resolves once the bitmap is ready to paint, not merely fetched
+      img
+        .decode()
+        .then(bump)
+        .catch(() => bump());
+    });
+
+    const guard = window.setTimeout(finish, MAX_HOLD_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(guard);
+    };
+  }, []);
+
+  // Unmount only after the fade has played, so nothing lingers in the DOM.
+  useEffect(() => {
+    if (!done) return;
+    const t = window.setTimeout(() => setGone(true), 900);
+    return () => window.clearTimeout(t);
+  }, [done]);
+
+  // No scroll lock here. Setting `overflow: hidden` on the document makes the
+  // page unscrollable, which collapses ScrollTrigger's pin distance to zero and
+  // leaves the hero stuck at the end of its timeline on first paint. The cover
+  // is fixed and full-screen, so nothing needs locking anyway.
+
+  if (gone) return null;
+
+  return (
+    <div className={`site-loader${done ? " is-done" : ""}`} aria-hidden={done}>
+      <div className="site-loader-inner">
+        <p className="site-loader-name">Yıldız Dikme</p>
+        <p className="site-loader-role">Creative Developer</p>
+
+        <div
+          className="site-loader-track"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(progress * 100)}
+        >
+          <span
+            className="site-loader-bar"
+            style={{ transform: `scaleX(${progress})` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+──────── C.10  app/Hero.tsx   *** THE ENGINE *** ────────
+"use client";
+
+import { useLayoutEffect, useRef } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import Lenis from "lenis";
+import HeroCircularGallery, {
+  type HeroCircularGalleryHandle,
+} from "./HeroCircularGallery";
+
+gsap.registerPlugin(ScrollTrigger);
+
+/**
+ * The hero pin was 3 viewports; the gallery needs room to be explored, so it is
+ * now 5. To keep the aperture looking exactly as it did, the window/header
+ * motion is driven by `apertureProgress`, which replays the original 3-viewport
+ * curve over the first 3 viewports of the longer pin — same scale, same
+ * perspective, same rate of travel — and then holds.
+ */
+const PIN_VIEWPORTS = 5;
+const APERTURE_VIEWPORTS = 3;
+const APERTURE_SCALE = PIN_VIEWPORTS / APERTURE_VIEWPORTS;
+
+/** Hero copy entry, remapped so it follows the gallery instead of preceding it. */
+const COPY_START = 0.78;
+/** Bottom fade into the plane section, kept clear of the gallery. */
+const FADE_START = 0.78;
+const FADE_SPAN = 0.12;
+
+export default function Hero() {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const fadeRef = useRef<HTMLDivElement | null>(null);
+  const galleryRef = useRef<HeroCircularGalleryHandle | null>(null);
+
+  useLayoutEffect(() => {
+    if (!rootRef.current) return;
+
+    const lenis = new Lenis();
+
+    /**
+     * A reload must always start the cinematic from the very beginning.
+     *
+     * The browser can restore the previous scroll offset, and once Lenis is
+     * running it writes its own position back to the document every frame — so
+     * a plain `window.scrollTo(0, 0)` is overwritten on the next tick and the
+     * aperture opens already enlarged. The reset therefore has to go through
+     * Lenis itself. Repeated once on the next frame in case the browser
+     * restores the offset immediately after mount.
+     */
+    const resetToStart = () =>
+      lenis.scrollTo(0, { immediate: true, force: true });
+
+    resetToStart();
+    const resetRaf = requestAnimationFrame(resetToStart);
+
+    const raf = (time: number) => {
+      lenis.raf(time * 1000);
+    };
+
+    lenis.on("scroll", ScrollTrigger.update);
+    gsap.ticker.add(raf);
+    gsap.ticker.lagSmoothing(0);
+
+    const ctx = gsap.context(() => {
+      const windowContainer = document.querySelector(".window-container");
+      const skyContainer = document.querySelector(".sky-container");
+      const heroCopy = document.querySelector(".hero-copy");
+      const heroHeader = document.querySelector(".hero-header");
+      const hero = document.querySelector(".hero");
+
+      if (
+        !windowContainer ||
+        !skyContainer ||
+        !heroCopy ||
+        !heroHeader ||
+        !hero
+      )
+        return;
+
+      const skyContainerHeight = (skyContainer as HTMLElement).offsetHeight;
+      const viewportHeight = window.innerHeight;
+      const skyMoveDistance = skyContainerHeight - viewportHeight;
+
+      // ✅ İlk frame flash’ini öldür: önce görünmez, sonra GSAP kontrolüne al
+      gsap.set(heroCopy, { yPercent: 100, autoAlpha: 1 });
+
+      ScrollTrigger.create({
+        trigger: hero,
+        start: "top top",
+        end: () => `+=${window.innerHeight * PIN_VIEWPORTS}px`,
+        pin: true,
+        pinSpacing: true,
+        scrub: 1,
+        invalidateOnRefresh: true,
+        onUpdate: (self) => {
+          const progress = self.progress;
+
+          // Original 3-viewport aperture curve, replayed over the first 3 of 5.
+          const ap = Math.min(1, progress * APERTURE_SCALE);
+
+          // window scale — unchanged formula, unchanged absolute rate
+          const windowScale = ap <= 0.5 ? 1 + (ap / 0.5) * 3 : 4;
+
+          gsap.set(windowContainer, { scale: windowScale });
+          gsap.set(heroHeader, { scale: windowScale, z: ap * 500 });
+
+          // sky move — spread across the full pin so the clouds keep drifting
+          // gently behind the gallery instead of freezing partway through
+          gsap.set(skyContainer, { y: -progress * skyMoveDistance });
+
+          // hero copy y — now enters after the gallery has left
+          let heroCopyY: number;
+          if (progress <= COPY_START) {
+            heroCopyY = 100;
+          } else if (progress >= 1) {
+            heroCopyY = 0;
+          } else {
+            heroCopyY = 100 * (1 - (progress - COPY_START) / (1 - COPY_START));
+          }
+
+          gsap.set(heroCopy, { yPercent: heroCopyY });
+
+          // fade overlay
+          if (fadeRef.current) {
+            const fade = gsap.utils.clamp(
+              0,
+              1,
+              (progress - FADE_START) / FADE_SPAN,
+            );
+            gsap.set(fadeRef.current, { opacity: fade });
+          }
+
+          // Gallery overlay — revealed off the aperture's own scale, then
+          // visible for the rest of the Hero. Imperative: no React state.
+          galleryRef.current?.update(progress);
+        },
+      });
+
+      ScrollTrigger.refresh();
+    }, rootRef);
+
+    return () => {
+      cancelAnimationFrame(resetRaf);
+      ctx.revert();
+      gsap.ticker.remove(raf);
+      lenis.destroy();
+    };
+  }, []);
+
+  return (
+    <div ref={rootRef}>
+      <section className="hero">
+        <div className="hero-fade" ref={fadeRef} />
+
+        <div className="sky-container">
+          <img src="/sky.jpg" alt="" />
+        </div>
+
+        {/* Overlay inside the pinned hero. Sits between the clouds and the
+            hero copy, so the copy always reads on top of it. The window is
+            painted after it — the glass is fully transparent, so at full
+            aperture the gallery shows straight through. */}
+        <HeroCircularGallery ref={galleryRef} />
+
+        <div className="hero-copy">
+          <h1>
+            What I build isn’t a page, but a passage. A sustained calm where
+            noise fades, edges soften, and attention holds a little longer than
+            expected. The interface stays steady while everything around it
+            keeps moving.
+          </h1>
+        </div>
+
+        <div className="window-container">
+          <img src="/window.png" alt="" />
+        </div>
+
+        <div className="hero-header">
+          <div className="col">
+            <h1>
+              Yıldız <br />
+              Dikme
+            </h1>
+            <p>
+              A practice suspended between craft and code. Interfaces, products,
+              and three-dimensional work—shaped with intent, built to be felt
+              before they are explained.
+            </p>
+          </div>
+
+          <div className="col">
+            <p>Creative Developer</p>
+            <h1>
+              Where ideas <br />
+              become interfaces
+            </h1>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  );
+}
+
+──────── C.11  app/HeroCircularGallery.tsx   *** THE BRIDGE *** ────────
+"use client";
+
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useSyncExternalStore,
+} from "react";
+import CircularGallery, {
+  type CircularGalleryApi,
+} from "@/components/CircularGallery";
+
+/**
+ * The gallery layer inside the Hero aperture sequence.
+ *
+ * This is NOT a page section. It is an overlay rendered inside the pinned
+ * `.hero`, above the cloud background and below the existing hero copy.
+ *
+ * Lifecycle:
+ *  - mounted and fully warmed (canvas, shaders, decoded textures) during idle
+ *    time right after the page settles, while still invisible
+ *  - revealed in a single step once the aperture is nearly complete — no fade,
+ *    no scale, no transform animation of the wrapper
+ *  - stays visible and interactive for the rest of the Hero, leaving only when
+ *    the Hero itself unpins into PlaneOutro
+ *
+ * Hero calls `update()` every scroll frame. That path touches inline styles and
+ * the imperative gallery API only — it never sets React state.
+ */
+
+/* ---------------------------------------------------------------------------
+ * Gallery items — edit freely.
+ *
+ * PLACEHOLDERS: only `Asteroid Bloom` is a real piece of work. The rest reuse
+ * assets that already ship with this site so the curve has enough distinct
+ * cards to read as a gallery. Swap them for real project stills; do not present
+ * them as client work.
+ *
+ * Note: images must be fully opaque. The gallery shader samples the texture
+ * directly, so a PNG with transparency (e.g. /window.png) renders as a black
+ * rectangle rather than compositing over the clouds.
+ * ------------------------------------------------------------------------- */
+const GALLERY_ITEMS = [
+  { image: "/media/asteroid/still-desktop.webp", text: "Asteroid Bloom" },
+  { image: "/sky.jpg", text: "Placeholder — Sky Study" },
+  { image: "/media/asteroid/poster-desktop.webp", text: "Placeholder — Pre-Bloom" },
+  { image: "/sky2.jpg", text: "Placeholder — Horizon" },
+];
+
+/*
+ * Entrance. The gallery rises into place exactly the way the hero copy does —
+ * it starts fully below the viewport and slides up as the visitor scrolls,
+ * so it is never "popped" into an empty cloud scene.
+ *
+ *   0.30  the aperture has finished (window scale 4); the gallery is still
+ *         entirely off-screen below, so nothing appears out of nowhere
+ *   0.48  fully in place
+ *   then  it stays there for the rest of the Hero — no fade, no exit
+ *
+ * Opacity is 1 the whole time. The only thing that moves is position.
+ */
+const ENTER_START = 0.3;
+const ENTER_END = 0.48;
+
+/** How many item-widths the vertical scroll advances once it is in place. */
+const ITEMS_TRAVELLED = 5;
+
+/** Conservative caps — this page already runs a second WebGL context. */
+const DPR_DESKTOP = 1.5;
+const DPR_MOBILE = 1;
+
+function useMediaQuery(query: string) {
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      const mq = window.matchMedia(query);
+      mq.addEventListener("change", onChange);
+      return () => mq.removeEventListener("change", onChange);
+    },
+    [query],
+  );
+
+  return useSyncExternalStore(
+    subscribe,
+    () => window.matchMedia(query).matches,
+    () => false,
+  );
+}
+
+export type HeroCircularGalleryHandle = {
+  /** Called from Hero's existing ScrollTrigger onUpdate. */
+  update: (progress: number) => void;
+};
+
+const HeroCircularGallery = forwardRef<HeroCircularGalleryHandle>(
+  function HeroCircularGallery(_props, ref) {
+    const wrapRef = useRef<HTMLDivElement | null>(null);
+    const apiRef = useRef<CircularGalleryApi | null>(null);
+    /** Mirrors the current visibility so we only touch the DOM on a change. */
+    const shownRef = useRef(false);
+
+    const isMobile = useMediaQuery("(max-width: 900px)");
+    const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+
+    // Images are requested on the very first client render, alongside the
+    // renderer below. Everything therefore loads behind the entry loader, and
+    // nothing at all is created once the visitor starts scrolling.
+    useEffect(() => {
+      if (reducedMotion) return;
+      GALLERY_ITEMS.forEach((item) => {
+        const img = new Image();
+        img.decoding = "async";
+        img.src = item.image;
+        void img.decode().catch(() => undefined);
+      });
+    }, [reducedMotion]);
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        update(progress: number) {
+          const wrap = wrapRef.current;
+          if (!wrap) return;
+
+          const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+          const slide = clamp01(
+            (progress - ENTER_START) / (ENTER_END - ENTER_START),
+          );
+
+          // Position only — opacity stays at 1 and is never animated.
+          wrap.style.transform = `translateY(${((1 - slide) * 100).toFixed(2)}svh)`;
+
+          // Visibility is the only binary, and it flips while the gallery is
+          // still completely off-screen, so it can never appear abruptly.
+          const shouldShow = progress >= ENTER_START;
+          if (shouldShow !== shownRef.current) {
+            shownRef.current = shouldShow;
+            wrap.style.visibility = shouldShow ? "visible" : "hidden";
+          }
+
+          // Dragging is live once it has settled into place.
+          const interactive = slide >= 1;
+          wrap.style.pointerEvents = interactive ? "auto" : "none";
+
+          if (!shouldShow || reducedMotion) return;
+
+          const api = apiRef.current;
+          if (!api) return;
+
+          // Items advance from the moment it lands to the end of the Hero. The
+          // user's drag offset lives inside the gallery and is added on top, so
+          // scrolling never cancels a drag.
+          const span = Math.max(0.0001, 1 - ENTER_END);
+          const travel = clamp01((progress - ENTER_END) / span);
+          const width = api.getItemWidth();
+          if (width > 0) api.setScrollBase(travel * ITEMS_TRAVELLED * width);
+        },
+      }),
+      [reducedMotion],
+    );
+
+    return (
+      <div className="hero-gallery" ref={wrapRef}>
+        <div className="hero-gallery-stage">
+          {reducedMotion && (
+            <div className="hero-gallery-static">
+              {GALLERY_ITEMS.slice(0, 3).map((item) => (
+                <figure key={item.text}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={item.image} alt="" decoding="async" />
+                  <figcaption>{item.text}</figcaption>
+                </figure>
+              ))}
+            </div>
+          )}
+
+          {!reducedMotion && (
+            <CircularGallery
+              items={GALLERY_ITEMS}
+              bend={isMobile ? 2 : 3}
+              textColor="#12212a"
+              borderRadius={0.03}
+              scrollEase={0.06}
+              dpr={isMobile ? DPR_MOBILE : DPR_DESKTOP}
+              // Wheel capture stays off — upstream listens on window and would
+              // spin the gallery on every scroll anywhere on the page while
+              // fighting Lenis. Pointer dragging stays on, scoped to the
+              // container, so the original click-and-drag interaction works.
+              captureWheel={false}
+              capturePointer
+              apiRef={apiRef}
+            />
+          )}
+        </div>
+      </div>
+    );
+  },
+);
+
+export default HeroCircularGallery;
+
+──────── C.12  app/PlaneOutro.tsx ────────
+"use client";
+
+import React, {
+  Suspense,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Canvas } from "@react-three/fiber";
+import { useGLTF } from "@react-three/drei";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import * as THREE from "three";
+
+gsap.registerPlugin(ScrollTrigger);
+
+const BASE_Y = 6.2;
+
+type PlaneModelProps = {
+  planeRef: React.MutableRefObject<THREE.Group | null>;
+  onReady: () => void;
+  isMobile: boolean;
+};
+
+function PlaneModel({ planeRef, onReady, isMobile }: PlaneModelProps) {
+  const { scene } = useGLTF("/models/business-jet.glb");
+
+  const prepared = useMemo(() => {
+    if (!scene) return null;
+
+    const clone = scene.clone(true);
+
+    // rotation önce (bounding box doğru ölçülsün)
+    clone.rotation.set(-Math.PI / 2, 0, Math.PI);
+
+    // ✅ Prod/dev farkını bitiren normalize
+    clone.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(clone);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+
+    const maxDim = Math.max(size.x, size.y, size.z);
+
+    // ✅ Desktopta şu anki görünümüne yakın bir hedef seçtik.
+    // Eğer hala çok büyük/küçük gelirse sadece TARGET ile oynarsın.
+    const TARGET = 10;
+
+    const normalizeScale = maxDim > 0 ? TARGET / maxDim : 1;
+
+    // ✅ Desktop/mobil oranını BOZMADAN koru
+    const DESKTOP_FACTOR = 0.9;
+    const MOBILE_FACTOR = 0.75;
+
+    clone.scale.setScalar(
+      normalizeScale * (isMobile ? MOBILE_FACTOR : DESKTOP_FACTOR),
+    );
+
+    return clone;
+  }, [scene, isMobile]);
+
+  useLayoutEffect(() => {
+    if (!prepared) return;
+    onReady();
+  }, [prepared, onReady]);
+
+  if (!prepared) return null;
+  return <primitive ref={planeRef} object={prepared} />;
+}
+
+export default function PlaneOutro() {
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const planeRef = useRef<THREE.Group | null>(null);
+  const leftTextRef = useRef<HTMLDivElement | null>(null);
+  const rightTextRef = useRef<HTMLDivElement | null>(null);
+  const bgFadeRef = useRef<HTMLDivElement | null>(null);
+
+  const [isPlaneReady, setIsPlaneReady] = useState(false);
+
+  const [isMobile, setIsMobile] = useState(false);
+  useLayoutEffect(() => {
+    const mq = window.matchMedia("(max-width: 900px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener?.("change", update);
+    return () => mq.removeEventListener?.("change", update);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!sectionRef.current) return;
+    if (!isPlaneReady) return;
+    if (!planeRef.current) return;
+
+    const START_OFFSET = -18;
+    const END_OFFSET = 12;
+
+    const ctx = gsap.context(() => {
+      // start pose
+      planeRef.current!.position.y = BASE_Y + START_OFFSET;
+
+      if (leftTextRef.current)
+        gsap.set(leftTextRef.current, { y: 80, opacity: 0 });
+      if (rightTextRef.current)
+        gsap.set(rightTextRef.current, { y: 80, opacity: 0 });
+
+      const toPlaneY = gsap.quickTo(planeRef.current!.position, "y", {
+        duration: 0.9,
+        ease: "power3.out",
+        overwrite: true,
+      });
+
+      const toLeftY = leftTextRef.current
+        ? gsap.quickTo(leftTextRef.current, "y", {
+            duration: 0.6,
+            ease: "power3.out",
+            overwrite: true,
+          })
+        : null;
+
+      const toLeftOpacity = leftTextRef.current
+        ? gsap.quickTo(leftTextRef.current, "opacity", {
+            duration: 0.6,
+            ease: "power2.out",
+            overwrite: true,
+          })
+        : null;
+
+      const toRightY = rightTextRef.current
+        ? gsap.quickTo(rightTextRef.current, "y", {
+            duration: 0.6,
+            ease: "power3.out",
+            overwrite: true,
+          })
+        : null;
+
+      const toRightOpacity = rightTextRef.current
+        ? gsap.quickTo(rightTextRef.current, "opacity", {
+            duration: 0.6,
+            ease: "power2.out",
+            overwrite: true,
+          })
+        : null;
+
+      const toBg = bgFadeRef.current
+        ? gsap.quickTo(bgFadeRef.current, "opacity", {
+            duration: 0.35,
+            ease: "power2.out",
+            overwrite: true,
+          })
+        : null;
+
+      const st = ScrollTrigger.create({
+        trigger: sectionRef.current!,
+        start: "top top",
+        end: "+=180%",
+        pin: true,
+        pinSpacing: true,
+        anticipatePin: 1,
+        invalidateOnRefresh: true,
+
+        onUpdate: (self) => {
+          const p = self.progress; // 0..1
+
+          const targetY = gsap.utils.interpolate(
+            BASE_Y + START_OFFSET,
+            BASE_Y + END_OFFSET,
+            p,
+          );
+          toPlaneY(targetY);
+
+          const leftP = gsap.utils.clamp(0, 1, (p - 0.08) / 0.2);
+          if (toLeftY) toLeftY(gsap.utils.interpolate(80, 0, leftP));
+          if (toLeftOpacity) toLeftOpacity(leftP);
+
+          const rightP = gsap.utils.clamp(0, 1, (p - 0.12) / 0.2);
+          if (toRightY) toRightY(gsap.utils.interpolate(80, 0, rightP));
+          if (toRightOpacity) toRightOpacity(rightP);
+
+          const bgP = gsap.utils.clamp(0, 1, (p - 0.72) / 0.28);
+          if (toBg) toBg(bgP);
+
+          const textP = gsap.utils.clamp(0, 1, (p - 0.78) / 0.22);
+          const rr = Math.round(15 + (255 - 15) * textP);
+          const gg = Math.round(15 + (255 - 15) * textP);
+          const bb = Math.round(15 + (255 - 15) * textP);
+
+          document.documentElement.style.setProperty(
+            "--plane-text-color",
+            `rgb(${rr},${gg},${bb})`,
+          );
+        },
+      });
+
+      return () => st.kill();
+    }, sectionRef);
+
+    return () => ctx.revert();
+  }, [isPlaneReady]);
+
+  // Kamera: aynen korunuyor
+  const cameraPosition = isMobile
+    ? ([0, 5.2, 26] as const)
+    : ([0, 4.4, 15] as const);
+  const cameraFov = isMobile ? 42 : 28;
+
+  return (
+    <section
+      ref={sectionRef}
+      className="plane-section relative z-10"
+      style={{ boxShadow: "0 160px 140px -80px rgba(0,0,0,0.95)" }}
+    >
+      <div className="plane-wrapper">
+        <div
+          ref={bgFadeRef}
+          className="pointer-events-none absolute inset-0 z-[1] bg-[#0b0b0c] opacity-0"
+          aria-hidden
+        />
+
+        <div className="left-text" ref={leftTextRef}>
+          <h2>Creative</h2>
+          <p>Digital work that moves with intent</p>
+        </div>
+
+        <div className="right-text" ref={rightTextRef}>
+          <h2>Technology</h2>
+        </div>
+
+        <Canvas
+          className="plane-canvas"
+          dpr={[1, 1.5]}
+          camera={{ position: cameraPosition, fov: cameraFov }}
+        >
+          <ambientLight intensity={1.1} />
+          <directionalLight position={[6, 10, 8]} intensity={2.2} />
+          <directionalLight position={[-6, 8, 6]} intensity={1.0} />
+          <Suspense fallback={null}>
+            <PlaneModel
+              planeRef={planeRef}
+              onReady={() => setIsPlaneReady(true)}
+              isMobile={isMobile}
+            />
+          </Suspense>
+        </Canvas>
+      </div>
+    </section>
+  );
+}
+
+useGLTF.preload("/models/business-jet.glb");
+
+──────── C.13  components/CircularGallery.tsx  (VENDORED + LOCALLY ADAPTED) ────────
+
+STEP 1 — install the upstream component. Run exactly:
+
+    npx shadcn@latest add @react-bits/CircularGallery-TS-CSS --yes
+
+This creates components/CircularGallery.tsx (1009 lines after patching) and
+components/CircularGallery.css, adds `ogl` to dependencies, and appends
+"@react-bits": "https://reactbits.dev/r/{name}.json" to the `registries` block in
+components.json. Existing aliases and folder structure are preserved. If the CLI
+reports a conflict, STOP and report it — do not force an overwrite.
+
+STEP 2 — apply exactly these local adaptations. Nothing else in the file changes:
+the render loop, the easing, the shaders, the bend/arc maths and the title
+rendering are all untouched, which is what preserves the original drag feel.
+
+  1. Add `'use client';` as the very first line. The component touches
+     window/document on mount.
+
+  2. Split upstream's single input path into two independent flags. Add to both
+     `AppConfig` and `CircularGalleryProps`:
+         captureWheel?: boolean    // default true
+         capturePointer?: boolean  // default true
+     Store both on the App instance. In addEventListeners(), `resize` is ALWAYS
+     attached to window; the wheel listeners are attached only when
+     `captureWheel`; the pointer listeners only when `capturePointer`.
+     Rationale: this host uses Lenis and a pinned GSAP timeline, so window-level
+     wheel capture must be off while pointer dragging stays on.
+
+  3. Replace the window-level mouse/touch drag with Pointer Events scoped to the
+     CONTAINER element. Delete onTouchDown/onTouchMove/onTouchUp; add:
+         onPointerDown / onPointerMove / onPointerUp / releasePointer / capturePointerId
+     and register on the container: pointerdown, pointermove, pointerup,
+     pointercancel, lostpointercapture, keydown.
+     - A mouse press is claimed immediately (`gestureResolved = true`) and only
+       for `button === 0`.
+     - A TOUCH pointer is NOT claimed until the gesture proves horizontal: wait
+       until |dx| or |dy| exceeds 8px, then claim only if |dx| > |dy|, otherwise
+       call releasePointer and let the page scroll.
+     - Hold pointer capture only for the duration of a drag; wrap
+       setPointerCapture / hasPointerCapture / releasePointerCapture in
+       try/catch (they throw if the pointer is already gone).
+     - preventDefault() is NEVER called anywhere.
+
+  4. Split the scroll target into two independent contributions. Add to App:
+         scrollBase: number = 0     // written by the host
+         dragOffset: number = 0     // accumulated by the user
+         applyTarget() { this.scroll.target = this.scrollBase + this.dragOffset }
+     - onPointerMove: `dragOffset = dragStartOffset - dx * (scrollSpeed * 0.025)` then applyTarget()
+     - onWheel (when captureWheel is on): accumulate into `dragOffset`, then applyTarget()
+     - onKeyDown Arrow keys: accumulate into `dragOffset`, then applyTarget()
+     - onCheck() (the release snap) computes `raw = scrollBase + dragOffset`,
+       snaps `raw` to the nearest item width, then sets
+       `dragOffset = snapped - scrollBase`. It must NEVER write scrollBase.
+
+  5. Add a `dpr?: number` prop, threaded to the renderer:
+         dpr: Math.min(window.devicePixelRatio || 1, this.dpr ?? 2)
+     Upstream's hard-coded cap of 2 becomes the default.
+
+  6. Expose an imperative handle. Add and export:
+         export interface CircularGalleryApi {
+           setScrollBase: (base: number) => void;
+           getItemWidth: () => number;
+           isDragging: () => boolean;
+         }
+     Add an `apiRef?: React.MutableRefObject<CircularGalleryApi | null>` prop and
+     populate it once the renderer is live, inside the same `.then()` that
+     constructs the App. Null it out in the effect's cleanup. Add the three
+     methods to App: setScrollBase(base) { this.scrollBase = base; this.applyTarget() },
+     getItemWidth() { return this.medias?.[0]?.width ?? 0 }, isDragging() { return this.isDown }.
+
+  7. Extend the effect's dependency array with captureWheel, capturePointer, dpr
+     and apiRef. Keep it a CONSTANT length across renders — a dependency array
+     that changes size between renders is a React error.
+
+  8. destroy() must release any held pointer capture, remove the container
+     listeners (not window ones) for the pointer events, remove the window
+     wheel/resize listeners, and detach the canvas.
+
+Upstream defaults that this project keeps unchanged: imageCount comes from the
+items array (4 items, internally concatenated with itself so the loop is
+seamless), scrollSpeed 2, and the shader/bend geometry.
+
+──────── C.14  components/CircularGallery.css  (ships with the component) ────────
+.circular-gallery {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  cursor: grab;
+}
+
+.circular-gallery:active {
+  cursor: grabbing;
+}
+
+.circular-gallery:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+}
+
+──────── C.15  app/Services.tsx ────────
+/**
+ * Services — an editorial index, not a card grid.
+ *
+ * Reads as a numbered table of contents in the site's own display serif, on the
+ * dark surface PlaneOutro already fades into. No new colours, no panels, no
+ * shadows: the only structure is the hairline rule the footer already uses.
+ */
+
+type Service = {
+  title: string;
+  summary: string;
+  categories: string[];
+};
+
+/** Editable. Order here is the order on the page. */
+const SERVICES: Service[] = [
+  {
+    title: "Creative Web Development",
+    summary:
+      "Scroll-driven, cinematic front-ends where the motion carries the argument rather than decorating it.",
+    categories: ["GSAP", "Lenis", "Next.js"],
+  },
+  {
+    title: "Full-Stack Product Development",
+    summary:
+      "Products taken from a first sketch to something people can sign into, pay for and rely on.",
+    categories: ["TypeScript", "APIs", "Data"],
+  },
+  {
+    title: "Interactive 3D Experiences",
+    summary:
+      "Real-time scenes built for the browser — lighting, camera and weight tuned until they feel physical.",
+    categories: ["Three.js", "React Three Fiber", "WebGL"],
+  },
+  {
+    title: "AI Product Prototyping",
+    summary:
+      "Working prototypes that put a model behind a real interface, so the idea can be judged by using it.",
+    categories: ["LLM interfaces", "Prototypes", "Tooling"],
+  },
+  {
+    title: "Technology Content & Collaborations",
+    summary:
+      "Long-form and short-form work about building software, and partnerships with brands worth naming.",
+    categories: ["Editorial", "Video", "Brand work"],
+  },
+];
+
+export default function Services() {
+  return (
+    <section className="editorial services" id="services">
+      <div className="editorial-inner">
+        <header className="editorial-head">
+          <p className="editorial-label">Practice</p>
+          <h2 className="editorial-title">
+            What I build, <br />
+            and how
+          </h2>
+          <p className="editorial-lede">
+            Five ways of working. Most projects are a combination — the split is
+            here to make the conversation easier, not to sell packages.
+          </p>
+        </header>
+
+        <ol className="service-list">
+          {SERVICES.map((service, i) => (
+            <li className="service-row" key={service.title}>
+              <span className="service-index" aria-hidden>
+                {String(i + 1).padStart(2, "0")}
+              </span>
+
+              <div className="service-body">
+                <h3 className="service-title">{service.title}</h3>
+                <p className="service-summary">{service.summary}</p>
+              </div>
+
+              <ul className="service-tags">
+                {service.categories.map((c) => (
+                  <li key={c}>{c}</li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ol>
+
+        <p className="editorial-foot">
+          <a className="editorial-link" href="#start">
+            Start a project
+          </a>
+        </p>
+      </div>
+    </section>
+  );
+}
+
+──────── C.16  app/StartProject.tsx ────────
+"use client";
+
+import { useState } from "react";
+
+/**
+ * Start a project — a written brief, not a contact form.
+ *
+ * The fields sit on hairline rules and read as a sentence being filled in, so
+ * it belongs to the same editorial language as the rest of the page rather than
+ * looking like a form widget dropped on top of it.
+ *
+ * FRONTEND ONLY. Nothing is sent anywhere. When a backend exists, replace the
+ * body of `handleSubmit` — no markup changes needed.
+ */
+
+const PROJECT_TYPES = [
+  "Interactive web experience",
+  "Full-stack product",
+  "3D / WebGL",
+  "AI prototype",
+  "Brand collaboration",
+  "Something else",
+];
+
+const BUDGETS = [
+  "Under €5k",
+  "€5k — €15k",
+  "€15k — €40k",
+  "€40k +",
+  "Not sure yet",
+];
+
+export default function StartProject() {
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    // No transport wired up yet — see the note in the component header.
+    setSubmitted(true);
+  };
+
+  return (
+    <section className="editorial start" id="start">
+      <div className="editorial-inner">
+        <header className="editorial-head">
+          <p className="editorial-label">Enquiry</p>
+          <h2 className="editorial-title">
+            Tell me what <br />
+            you are making
+          </h2>
+          <p className="editorial-lede">
+            A few lines are enough to start. The more specific the constraint,
+            the more useful the first reply.
+          </p>
+        </header>
+
+        <form className="brief" onSubmit={handleSubmit}>
+          <div className="brief-grid">
+            <label className="brief-field">
+              <span className="brief-label">Name</span>
+              <input
+                className="brief-input"
+                name="name"
+                type="text"
+                autoComplete="name"
+                placeholder="Your name"
+                required
+              />
+            </label>
+
+            <label className="brief-field">
+              <span className="brief-label">Email</span>
+              <input
+                className="brief-input"
+                name="email"
+                type="email"
+                autoComplete="email"
+                placeholder="you@studio.com"
+                required
+              />
+            </label>
+
+            <label className="brief-field">
+              <span className="brief-label">Company or brand</span>
+              <input
+                className="brief-input"
+                name="company"
+                type="text"
+                autoComplete="organization"
+                placeholder="Optional"
+              />
+            </label>
+
+            <label className="brief-field">
+              <span className="brief-label">Project type</span>
+              <select className="brief-input brief-select" name="type" defaultValue="">
+                <option value="" disabled>
+                  Select one
+                </option>
+                {PROJECT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="brief-field">
+              <span className="brief-label">Estimated budget</span>
+              <select className="brief-input brief-select" name="budget" defaultValue="">
+                <option value="" disabled>
+                  Select a range
+                </option>
+                {BUDGETS.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="brief-field brief-field-wide">
+              <span className="brief-label">About the project</span>
+              <textarea
+                className="brief-input brief-textarea"
+                name="message"
+                rows={3}
+                placeholder="What it is, who it is for, and when it needs to exist."
+                required
+              />
+            </label>
+          </div>
+
+          <div className="brief-foot">
+            <button className="brief-submit" type="submit">
+              Send the brief
+            </button>
+
+            <p className="brief-note" role="status">
+              {submitted
+                ? "Nothing was sent — this form is not connected to a backend yet."
+                : "Replies within two working days."}
+            </p>
+          </div>
+        </form>
+      </div>
+    </section>
+  );
+}
+
+──────── C.17  app/Community.tsx ────────
+/**
+ * Community & membership — frontend presentation only.
+ *
+ * No auth, no database, no payments. Tiers are ruled rows rather than pricing
+ * cards, and the member-only preview is deliberately quiet: it shows what
+ * exists without pretending anything is unlocked.
+ */
+
+type Tier = {
+  name: string;
+  price: string;
+  note: string;
+  includes: string[];
+};
+
+/** Editable. */
+const TIERS: Tier[] = [
+  {
+    name: "Open",
+    price: "Free",
+    note: "No account needed for most of it.",
+    includes: [
+      "Monthly letter — what I built and what broke",
+      "Public code experiments",
+      "Event announcements",
+    ],
+  },
+  {
+    name: "Studio",
+    price: "Premium",
+    note: "For people building the same kind of thing.",
+    includes: [
+      "Full source for the scroll and 3D studies",
+      "Recorded build sessions",
+      "Direct questions, answered",
+      "Early access to new work",
+    ],
+  },
+];
+
+/** Editable. Titles only — nothing here is a real gated post yet. */
+const PREVIEW = [
+  { kind: "Resource", title: "Pinned scroll timelines without the jank" },
+  { kind: "Session", title: "Normalising a GLB so it survives production" },
+  { kind: "Note", title: "When a WebGL gallery is worth the weight" },
+];
+
+export default function Community() {
+  return (
+    <section className="editorial community" id="community">
+      <div className="editorial-inner">
+        <header className="editorial-head">
+          <p className="editorial-label">Community</p>
+          <h2 className="editorial-title">
+            Build alongside, <br />
+            not just watch
+          </h2>
+          <p className="editorial-lede">
+            A small room for people making interfaces that move. Notes, source
+            files and recorded sessions from work that actually shipped.
+          </p>
+        </header>
+
+        <div className="community-grid">
+          <div className="tiers">
+            {TIERS.map((tier) => (
+              <div className="tier" key={tier.name}>
+                <div className="tier-head">
+                  <h3 className="tier-name">{tier.name}</h3>
+                  <span className="tier-price">{tier.price}</span>
+                </div>
+                <p className="tier-note">{tier.note}</p>
+                <ul className="tier-list">
+                  {tier.includes.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          <div className="preview">
+            <p className="editorial-label">Inside</p>
+            <ul className="preview-list">
+              {PREVIEW.map((item) => (
+                <li className="preview-row" key={item.title}>
+                  <span className="preview-kind">{item.kind}</span>
+                  <span className="preview-title">{item.title}</span>
+                  <span className="preview-lock" aria-label="Members only">
+                    ·
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        <div className="community-actions">
+          <button className="editorial-button" type="button">
+            Join the community
+          </button>
+          <button className="editorial-button editorial-button-quiet" type="button">
+            Log in
+          </button>
+          <p className="community-note">Membership opens soon.</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+──────── C.18  app/GlobalFooter.tsx ────────
+"use client";
+
+import { useLayoutEffect, useRef } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { Globe } from "@/components/ui/globe";
+
+gsap.registerPlugin(ScrollTrigger);
+
+const PLANE_BG = "#cfe6ea";
+const FOOTER_BG = "#0b0b0c";
+
+export default function GlobalFooter() {
+  const sectionRef = useRef<HTMLElement | null>(null);
+
+  useLayoutEffect(() => {
+    const section = sectionRef.current;
+    const pageBg = typeof document !== "undefined" ? document.getElementById("page-bg") : null;
+
+    if (!section) return;
+
+    // Arka plan: footer yaklaşırken mavi → siyah (yazı rengi PlaneOutro pin progress'ten)
+    const stConfig = {
+      trigger: section,
+      start: "top 80%",
+      end: "top 20%",
+      scrub: true,
+    };
+
+    const ctx = gsap.context(() => {
+      if (pageBg) {
+        gsap.fromTo(
+          pageBg,
+          { backgroundColor: PLANE_BG },
+          { backgroundColor: FOOTER_BG, ease: "none", scrollTrigger: { ...stConfig } }
+        );
+      }
+    }, section);
+
+    return () => ctx.revert();
+  }, []);
+
+  return (
+    <section
+      ref={sectionRef}
+      id="global"
+      className="relative min-h-[100svh] w-full overflow-hidden bg-[#0b0b0c] text-white"
+    >
+      {/* vignette + soft gradients */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-0 [background:radial-gradient(55%_60%_at_50%_30%,rgba(255,255,255,0.12)_0%,rgba(0,0,0,0)_55%),radial-gradient(70%_70%_at_50%_80%,rgba(0,0,0,0)_0%,rgba(0,0,0,0.92)_72%)]" />
+        {/* subtle horizontal fog */}
+        <div className="absolute inset-0 opacity-60 [background:radial-gradient(70%_40%_at_50%_45%,rgba(255,255,255,0.10)_0%,rgba(0,0,0,0)_60%)]" />
+      </div>
+
+      {/* huge background word */}
+      <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 select-none whitespace-nowrap font-[600] tracking-tight text-white/10 blur-[0.2px] [font-size:clamp(160px,28vw,440px)] max-md:top-1/2 max-md:-translate-y-[calc(50%-10px)] md:top-14 md:-translate-y-[160px]">
+        Global
+      </div>
+
+      {/* Blur halka – tıklamayı geçir */}
+      <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center">
+        <div className="mx-auto aspect-square w-[min(94vh,1020px)] rounded-full bg-white/10 blur-3xl translate-y-[-280px]" />
+      </div>
+      {/* Globe – kendi boyutunda, z-[11] ile içeriğin üstünde; desktop’ta tıklanabilir */}
+      <div className="absolute left-1/2 top-1/2 z-[11] -translate-x-1/2 -translate-y-1/2 translate-y-[-280px]">
+        <div className="aspect-square w-[min(92vh,1000px)]">
+          <Globe className="!inset-0" />
+        </div>
+      </div>
+
+      {/* Tüm yazılar kürenin önünde; pointer-events-none ile küre tıklanabilir kalır */}
+      <div className="pointer-events-none relative z-10 mx-auto flex w-full max-w-[1400px] flex-col px-8">
+        {/* footer text – en üstte */}
+        <div className="pointer-events-auto border-b border-white/5 pb-6 pt-6">
+          <div className="flex flex-col gap-4 text-xs text-white/60 md:flex-row md:items-center md:justify-between">
+            <div>©2026 YILDIZ DIKME. ALL RIGHTS RESERVED</div>
+            <div className="flex flex-wrap gap-6">
+              <a className="hover:text-white" href="#privacy">
+                PRIVACY
+              </a>
+              <a className="hover:text-white" href="#colophon">
+                COLOPHON
+              </a>
+              <a className="hover:text-white" href="#github">
+                GITHUB
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* nav + brand */}
+        <div className="pointer-events-auto flex items-start justify-between gap-10 pt-4">
+          <nav className="flex flex-wrap gap-8 text-sm text-white/80">
+            <a className="hover:text-white" href="#work">
+              Work
+            </a>
+            <a className="hover:text-white" href="#services">
+              Services
+            </a>
+            <a className="hover:text-white" href="#community">
+              Community
+            </a>
+            <a className="hover:text-white" href="#global">
+              Global
+            </a>
+          </nav>
+          <div className="text-right text-sm text-white/80">
+            <div className="font-medium text-white">Yıldız Dikme</div>
+            <div className="mt-1">Creative Developer</div>
+            <a className="hover:text-white" href="/booking">
+              Start a project
+            </a>
+          </div>
+        </div>
+
+        {/* main layout: sol yazı, sağ iletişim – bottom 0 */}
+        <div className="pointer-events-auto grid min-h-[calc(100svh-280px)] flex-1 grid-cols-[1fr_1.6fr_1fr] items-end gap-10 pb-10 pt-10">
+          <div>
+            <h3 className="max-w-[18ch] text-[clamp(30px,2.4vw,44px)] font-semibold leading-[0.95] tracking-tight">
+              Build anywhere with <br />
+              total craft and <br />
+              control
+            </h3>
+          </div>
+          <div className="pointer-events-none flex items-center justify-center">
+            {/* ortada küre – tıklamalar geçsin, mouse ile döndürülebilsin */}
+          </div>
+          <div className="mt-10 text-sm text-white/80 lg:mt-0 lg:text-right">
+            <div className="font-medium text-white">FOR INQUIRIES</div>
+            <div className="mt-3 space-y-1">
+              <div>hello@yildizdikme.com</div>
+              <div>Projects · Collaborations</div>
+            </div>
+            <div className="mt-7 flex items-center gap-3 lg:justify-end">
+              <span className="h-px w-10 bg-white/30" />
+              <span className="text-white/70">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* MOBILE tweaks */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-black/40 lg:hidden" />
+    </section>
+  );
+}
+
+──────── C.19  components/ui/globe.tsx ────────
+"use client"
+
+import { useEffect, useRef } from "react"
+import createGlobe, { type COBEOptions } from "cobe"
+import { useMotionValue, useSpring } from "motion/react"
+import { cn } from "@/lib/utils"
+
+const MOVEMENT_DAMPING = 1400
+
+const DEFAULT_CONFIG: COBEOptions = {
+  width: 1200,
+  height: 1200,
+  onRender: () => {},
+  devicePixelRatio: 2,
+  phi: 0,
+  theta: 0.3,
+  dark: 1,
+  diffuse: 0.35,
+  mapSamples: 16000,
+  mapBrightness: 1.0,
+  baseColor: [1, 1, 1],
+  markerColor: [251 / 255, 100 / 255, 21 / 255],
+  glowColor: [0.85, 0.85, 0.85],
+  markers: [
+    { location: [14.5995, 120.9842], size: 0.03 },
+    { location: [19.076, 72.8777], size: 0.1 },
+    { location: [23.8103, 90.4125], size: 0.05 },
+    { location: [30.0444, 31.2357], size: 0.07 },
+    { location: [39.9042, 116.4074], size: 0.08 },
+    { location: [-23.5505, -46.6333], size: 0.1 },
+    { location: [19.4326, -99.1332], size: 0.1 },
+    { location: [40.7128, -74.006], size: 0.1 },
+    { location: [34.6937, 135.5022], size: 0.05 },
+    { location: [41.0082, 28.9784], size: 0.06 },
+  ],
+}
+
+export function Globe({
+  className,
+  config = DEFAULT_CONFIG,
+}: {
+  className?: string
+  config?: COBEOptions
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const pointerInteracting = useRef<number | null>(null)
+  const pointerInteractionMovement = useRef(0)
+
+  const r = useMotionValue(0)
+  const rs = useSpring(r, { mass: 1, damping: 30, stiffness: 100 })
+
+  const updatePointerInteraction = (value: number | null) => {
+    pointerInteracting.current = value
+    if (canvasRef.current) {
+      canvasRef.current.style.cursor = value !== null ? "grabbing" : "grab"
+    }
+  }
+
+  const updateMovement = (clientX: number) => {
+    if (pointerInteracting.current !== null) {
+      const delta = clientX - pointerInteracting.current
+      pointerInteractionMovement.current = delta
+      r.set(r.get() + delta / MOVEMENT_DAMPING)
+    }
+  }
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    let phi = 0
+    let width = 0
+
+    const onResize = () => {
+      width = canvas.offsetWidth || 1
+    }
+
+    window.addEventListener("resize", onResize)
+    onResize()
+
+    const globe = createGlobe(canvas, {
+      ...config,
+      width: Math.floor(width * 2),
+      height: Math.floor(width * 2),
+      onRender: (state) => {
+        if (!pointerInteracting.current) phi += 0.005
+        state.phi = phi + rs.get()
+        state.width = Math.floor(width * 2)
+        state.height = Math.floor(width * 2)
+      },
+    })
+
+    // fade-in
+    requestAnimationFrame(() => {
+      if (canvasRef.current) canvasRef.current.style.opacity = "1"
+    })
+
+    return () => {
+      globe.destroy()
+      window.removeEventListener("resize", onResize)
+    }
+  }, [rs, config])
+
+  return (
+    <div
+      className={cn(
+        // ✅ artık max-w yok -> parent ne verirse o kadar büyür
+        "absolute inset-0 mx-auto aspect-square w-full [contain:layout_paint_size]",
+        className
+      )}
+    >
+      <canvas
+        ref={canvasRef}
+        className="size-full opacity-0 transition-opacity duration-500"
+        onPointerDown={(e) => updatePointerInteraction(e.clientX)}
+        onPointerUp={() => updatePointerInteraction(null)}
+        onPointerOut={() => updatePointerInteraction(null)}
+        onMouseMove={(e) => updateMovement(e.clientX)}
+        onTouchMove={(e) => e.touches[0] && updateMovement(e.touches[0].clientX)}
+      />
+    </div>
+  )
+}
+
+──────── C.20  app/globals.css   *** LOAD-BEARING LAYOUT — 1124 lines, order matters *** ────────
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --light: #fff;
+  --dark: #0f0f0f;
+  --plane-bg: #cfe6ea;
+  --plane-text-color: #0f0f0f; /* footer'a yaklaşınca GSAP ile #ffffff yapılıyor */
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Instrument Serif", sans-serif;
+  color: var(--dark);
+}
+
+img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+h1 {
+  font-size: clamp(5rem, 6vw, 7rem);
+  font-weight: 500;
+  line-height: 0.8;
+}
+
+p {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+section {
+  position: relative;
+  width: 100%;
+  height: 100svh;
+  overflow: hidden;
+}
+
+.hero {
+  perspective: 1000px;
+  color: var(--light);
+  position: relative; /* fade overlay + compositing */
+  isolation: isolate; /* ✅ desktopu bozmaz, mobile seam’i azaltır */
+}
+
+.outro {
+  padding: 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.hero-copy {
+  opacity: 0; /* ✅ ilk render’da gizli */
+  visibility: hidden; /* ✅ 1 frame flash tamamen biter */
+}
+
+.sky-container,
+.hero-copy,
+.window-container,
+.hero-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  will-change: transform;
+}
+
+.sky-container {
+  position: relative;
+  height: 350svh;
+}
+
+/* ✅ Sky'nin altına base fade (desktop için aynı bırakıldı) */
+.sky-container::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 25vh;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(207, 230, 234, 1) 100%
+  );
+}
+
+.hero-copy {
+  height: 100svh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.hero-copy h1 {
+  width: 85%;
+}
+
+.window-container {
+  height: 100svh;
+}
+
+.hero-header {
+  height: 100svh;
+  padding: 2rem;
+  display: flex;
+  transform-style: preserve-3d;
+}
+
+.hero-header .col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.hero-header .col p {
+  width: 50%;
+}
+
+.hero-header .col:nth-child(2) {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.plane-section {
+  background: var(--plane-bg);
+}
+
+/* Plane section */
+.plane-section {
+  position: relative;
+  height: 100vh;
+  background: var(--plane-bg);
+  overflow: hidden;
+}
+
+.plane-wrapper {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* ❌ GLOBAL canvas kuralı kaldırıldı */
+/* ✅ SADECE plane canvas */
+.plane-canvas {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 2;
+}
+
+/* Plane section: varsayılan siyah; footer'a yaklaşınca GSAP --plane-text-color ile beyaz */
+.left-text,
+.right-text {
+  color: var(--plane-text-color);
+}
+
+.left-text {
+  position: absolute;
+  left: 6%;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  max-width: 400px;
+}
+
+.right-text {
+  position: absolute;
+  right: 6%;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  text-align: right;
+}
+
+.left-text h2,
+.right-text h2 {
+  font-size: clamp(48px, 8vw, 120px);
+  line-height: 0.9;
+  margin: 0;
+  font-weight: 700;
+}
+
+.left-text p {
+  margin-top: 16px;
+  opacity: 0.8;
+}
+
+/* ✅ Hero altında scroll ile açılan fade overlay (desktop OK) */
+.hero-fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 30vh;
+  pointer-events: none;
+  z-index: 999;
+
+  opacity: 0;
+  transition: opacity 0.1s linear;
+
+  background: linear-gradient(
+    to bottom,
+    rgba(207, 230, 234, 0) 0%,
+    rgba(207, 230, 234, 0.55) 45%,
+    rgba(207, 230, 234, 1) 100%
+  );
+
+  filter: blur(14px);
+  transform: translateY(14px);
+}
+
+@media (max-width: 1000px) {
+  h1 {
+    font-size: 3rem;
+  }
+
+  p {
+    font-size: 1.125rem;
+  }
+
+  /* ✅ mobile'da hero-fade aynı kalsın ama biraz daha güçlü */
+  .hero-fade {
+    bottom: -14px;
+    height: 40vh;
+    filter: blur(22px);
+    transform: translateY(22px);
+  }
+
+  /* ✅ asıl seam’i yok eden: sky overlay'ini güçlendir (desktop bozulmaz) */
+  .sky-container::after {
+    height: 34vh;
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0.22) 0%,
+        rgba(0, 0, 0, 0.1) 18%,
+        rgba(0, 0, 0, 0) 42%
+      ),
+      linear-gradient(
+        to bottom,
+        rgba(207, 230, 234, 0) 0%,
+        rgba(207, 230, 234, 0.65) 55%,
+        rgba(207, 230, 234, 1) 100%
+      );
+    filter: blur(10px);
+    transform: translateY(10px);
+  }
+
+  /* ✅ sky görseli altındaki 1px bandı yut */
+  .sky-container img {
+    transform: translateY(6px) scale(1.03);
+    transform-origin: bottom;
+  }
+}
+
+/* ✅ iOS Safari ekstra güvenlik */
+@supports (-webkit-touch-callout: none) {
+  .hero-fade {
+    bottom: -16px;
+    filter: blur(24px);
+    transform: translateY(24px);
+  }
+
+  .sky-container::after {
+    height: 38vh;
+    filter: blur(12px);
+    transform: translateY(12px);
+  }
+
+  .sky-container img {
+    transform: translateY(7px) scale(1.035);
+  }
+}
+
+/* ✅ Mobile: window içindeki yazılar taşmasın (DESKTOP bozulmaz) */
+@media (max-width: 1000px) {
+  .hero-header {
+    padding: 1.25rem; /* desktop 2rem kalır */
+    display: grid; /* flex yerine daha stabil */
+    grid-template-columns: 1fr; /* tek kolon */
+    align-content: space-between;
+    gap: 1.25rem;
+  }
+
+  .hero-header .col {
+    justify-content: flex-start;
+    gap: 0.75rem;
+  }
+
+  /* Sağ kolon mobilde sağa yaslanıp taşıyordu -> normal akış */
+  .hero-header .col:nth-child(2) {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  /* Metinleri mobile’a uygun küçült */
+  .hero-header h1 {
+    font-size: clamp(2.2rem, 8.5vw, 3.2rem);
+    line-height: 0.9;
+    letter-spacing: -0.02em;
+  }
+
+  .hero-header p {
+    width: 100% !important; /* desktop 50% kuralını ez */
+    max-width: 28ch; /* çok uzamasın */
+    font-size: 1rem;
+    line-height: 1.1;
+    opacity: 0.92;
+  }
+
+  /* “Observation Mode” gibi küçük metin */
+  .hero-header .col:nth-child(2) > p {
+    font-size: 0.95rem;
+    opacity: 0.9;
+  }
+}
+
+@media (max-width: 600px) {
+  .window-container img {
+    object-fit: cover;
+    object-position: center;
+    transform: scale(1.02); /* çok minik, sadece mobile */
+  }
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+  }
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+}
+
+/* ============================================================
+   Hero circular gallery
+   Overlay INSIDE the pinned .hero — not a section. Every selector
+   below is scoped to .hero-gallery*, so no existing rule changes.
+
+   The wrapper never animates: no transition, no fade, no scale.
+   Hero flips visibility/opacity/pointer-events in one step and the
+   only thing that moves afterwards is the items on the curve.
+   ============================================================ */
+
+.hero-gallery {
+  position: absolute;
+  inset: 0;
+  /* 0, not a positive value: it must paint below .hero-copy, which is a
+     positioned sibling with z-index auto that comes later in the DOM.
+     Layering is clouds → gallery → hero copy. */
+  z-index: 0;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Anchored to the top of the viewport, not centred: the hero copy is a
+     vertically centred block, so the only way to keep real clearance above it
+     is to pin the gallery to the upper band. It never moves after that. */
+  justify-content: flex-start;
+  /* The 33px compensates for the label that used to sit above the stage, so
+     removing it left the cards at exactly the same height. */
+  padding-top: calc(3svh + 33px);
+  gap: 1.1rem;
+
+  /* Pre-entry state: parked below the viewport, never faded. Hero slides it
+     up into place and it stays. Opacity is always 1. */
+  opacity: 1;
+  visibility: hidden;
+  transform: translateY(100svh);
+  pointer-events: none;
+
+  /* the reveal is a single step — never interpolate it */
+  transition: none !important;
+}
+
+.hero-gallery-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(18, 33, 42, 0.62);
+  margin: 0;
+}
+
+/* Reserved box: fixed height regardless of media state, so warming up the
+   WebGL canvas cannot shift anything. */
+.hero-gallery-stage {
+  position: relative;
+  width: 100%;
+  height: min(42svh, 380px);
+
+  /* the browser keeps vertical panning; horizontal gestures reach our
+     pointer handlers, so page scroll is never blocked */
+  touch-action: pan-y;
+}
+
+/* The React Bits container fills the reserved stage. */
+.hero-gallery-stage .circular-gallery {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Reduced motion: a still arrangement in the same place. */
+.hero-gallery-static {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1rem, 3vw, 2.5rem);
+  padding: 0 2rem;
+}
+
+.hero-gallery-static figure {
+  width: min(26vw, 280px);
+  margin: 0;
+}
+
+.hero-gallery-static img {
+  width: 100%;
+  height: min(30svh, 270px);
+  object-fit: cover;
+  border-radius: 2px;
+  display: block;
+}
+
+.hero-gallery-static figcaption {
+  margin-top: 0.7rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  color: rgba(18, 33, 42, 0.7);
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .hero-gallery {
+    gap: 1rem;
+  }
+
+  .hero-gallery-label {
+    font-size: 0.68rem;
+    letter-spacing: 0.18em;
+  }
+
+  .hero-gallery-stage {
+    height: min(32svh, 260px);
+  }
+
+  .hero-gallery-static figure {
+    width: 40vw;
+  }
+
+  .hero-gallery-static img {
+    height: min(22svh, 190px);
+  }
+
+  /* three stills do not fit a phone; show two */
+  .hero-gallery-static figure:nth-child(3) {
+    display: none;
+  }
+}
+
+/* ============================================================
+   Entry loader — scoped to .site-loader*, nothing else changes.
+   ============================================================ */
+
+.site-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* the site's own cold blue-white, so the reveal is a continuation */
+  background: linear-gradient(180deg, #dceef2 0%, #cfe6ea 55%, #c3dee4 100%);
+  color: #12212a;
+
+  opacity: 1;
+  transition: opacity 0.8s ease;
+}
+
+.site-loader.is-done {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.site-loader-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0 2rem;
+  text-align: center;
+}
+
+.site-loader-name {
+  font-size: clamp(1.9rem, 4vw, 3.1rem);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.site-loader-role {
+  font-size: 0.74rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  margin: 0 0 0.6rem;
+}
+
+.site-loader-track {
+  width: min(220px, 50vw);
+  height: 1px;
+  background: rgba(18, 33, 42, 0.18);
+  overflow: hidden;
+}
+
+.site-loader-bar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: rgba(18, 33, 42, 0.75);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.45s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-loader,
+  .site-loader-bar {
+    transition: none;
+  }
+}
+
+/* The gallery now occupies the top band and stays there. The hero copy is a
+   vertically centred block, which makes clearance impossible, so it is moved
+   into the lower band instead. Its typography, size, colour and the existing
+   yPercent entry animation are all untouched — only the resting position. */
+.hero-copy {
+  align-items: flex-end;
+  padding-bottom: 6svh;
+}
+
+@media (max-width: 900px) {
+  .hero-copy {
+    padding-bottom: 4svh;
+  }
+}
+
+/* ============================================================
+   Editorial sections — Services / Start a project / Community
+   Additive only. Every selector is scoped to .editorial* or the
+   section's own class, so no existing rule changes behaviour.
+
+   These live inside the dark corridor PlaneOutro already fades
+   into (#0b0b0c) and reuse the hairline + micro-label language
+   the footer established. No new colours are introduced.
+   ============================================================ */
+
+.editorial {
+  /* overrides the global `section { height:100svh; overflow:hidden }` */
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+
+  background: #0b0b0c;
+  color: var(--light);
+  padding: clamp(6rem, 14vh, 11rem) 0;
+}
+
+.editorial-inner {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+.editorial-head {
+  max-width: 62ch;
+  margin-bottom: clamp(3.5rem, 8vh, 6rem);
+}
+
+/* same micro-label as .hero-gallery-label, in the dark register */
+.editorial-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  margin: 0 0 1.4rem;
+}
+
+.editorial-title {
+  font-size: clamp(2.6rem, 5.4vw, 5rem);
+  font-weight: 500;
+  line-height: 0.88;
+  letter-spacing: -0.01em;
+  margin: 0 0 1.6rem;
+}
+
+.editorial-lede {
+  font-size: clamp(1rem, 1.2vw, 1.2rem);
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+}
+
+.editorial-foot {
+  margin-top: clamp(2.5rem, 6vh, 4rem);
+}
+
+.editorial-link {
+  font-size: 0.85rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--light);
+  text-decoration: none;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+  transition: border-color 0.35s ease;
+}
+
+.editorial-link:hover {
+  border-color: rgba(255, 255, 255, 0.9);
+}
+
+.editorial-link:focus-visible,
+.editorial-button:focus-visible,
+.brief-input:focus-visible,
+.brief-submit:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 6px;
+}
+
+.editorial-button {
+  font-family: inherit;
+  font-size: 0.85rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #0b0b0c;
+  background: var(--light);
+  border: 1px solid var(--light);
+  padding: 0.95rem 1.7rem;
+  cursor: pointer;
+  transition:
+    background 0.35s ease,
+    color 0.35s ease;
+}
+
+.editorial-button:hover {
+  background: transparent;
+  color: var(--light);
+}
+
+.editorial-button-quiet {
+  background: transparent;
+  color: var(--light);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.editorial-button-quiet:hover {
+  border-color: var(--light);
+  background: transparent;
+  color: var(--light);
+}
+
+/* ---- Services ---------------------------------------------- */
+
+.service-list {
+  list-style: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.service-row {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr) minmax(0, 15rem);
+  gap: 2rem;
+  align-items: baseline;
+  padding: clamp(1.8rem, 4vh, 2.8rem) 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.service-index {
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.35);
+  font-variant-numeric: tabular-nums;
+}
+
+.service-title {
+  font-size: clamp(1.7rem, 2.7vw, 2.5rem);
+  font-weight: 500;
+  line-height: 1.02;
+  margin: 0 0 0.75rem;
+}
+
+.service-summary {
+  font-size: 1rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.58);
+  max-width: 52ch;
+  margin: 0;
+}
+
+.service-tags {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.1rem;
+  justify-content: flex-end;
+  font-size: 0.78rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+/* ---- Start a project --------------------------------------- */
+
+.brief-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(1.6rem, 3vw, 2.6rem);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: clamp(2rem, 5vh, 3rem);
+}
+
+.brief-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.brief-field-wide {
+  grid-column: 1 / -1;
+}
+
+.brief-label {
+  font-size: 0.74rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.brief-input {
+  font-family: inherit;
+  font-size: clamp(1.05rem, 1.5vw, 1.35rem);
+  line-height: 1.3;
+  color: var(--light);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0;
+  padding: 0 0 0.85rem;
+  transition: border-color 0.35s ease;
+  width: 100%;
+}
+
+.brief-input::placeholder {
+  color: rgba(255, 255, 255, 0.28);
+}
+
+.brief-input:hover,
+.brief-input:focus {
+  border-bottom-color: rgba(255, 255, 255, 0.65);
+}
+
+.brief-input:focus {
+  outline: none;
+}
+
+.brief-select {
+  appearance: none;
+  cursor: pointer;
+}
+
+/* the popup is drawn by the OS — keep its own options legible */
+.brief-select option {
+  color: #0f0f0f;
+  background: #fff;
+}
+
+.brief-textarea {
+  resize: vertical;
+  min-height: 4.5rem;
+}
+
+.brief-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.5rem 2rem;
+  margin-top: clamp(2.5rem, 6vh, 4rem);
+}
+
+.brief-submit {
+  font-family: inherit;
+  font-size: 0.85rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #0b0b0c;
+  background: var(--light);
+  border: 1px solid var(--light);
+  padding: 1rem 2rem;
+  cursor: pointer;
+  transition:
+    background 0.35s ease,
+    color 0.35s ease;
+}
+
+.brief-submit:hover {
+  background: transparent;
+  color: var(--light);
+}
+
+.brief-note {
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.45);
+  margin: 0;
+}
+
+/* ---- Community --------------------------------------------- */
+
+.community-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: clamp(2.5rem, 6vw, 5rem);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: clamp(2rem, 5vh, 3rem);
+}
+
+.tiers {
+  display: grid;
+  gap: clamp(2rem, 4vh, 3rem);
+}
+
+.tier {
+  padding-bottom: clamp(1.6rem, 3.5vh, 2.4rem);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.tier-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 0.8rem;
+}
+
+.tier-name {
+  font-size: clamp(1.6rem, 2.4vw, 2.2rem);
+  font-weight: 500;
+  line-height: 1;
+  margin: 0;
+}
+
+.tier-price {
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.tier-note {
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0 0 1.3rem;
+}
+
+.tier-list {
+  list-style: none;
+  display: grid;
+  gap: 0.6rem;
+  font-size: 0.98rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.tier-list li {
+  padding-left: 1.2rem;
+  position: relative;
+}
+
+.tier-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.62em;
+  width: 0.5rem;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.preview-list {
+  list-style: none;
+  margin-top: 1.4rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.preview-row {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) 1rem;
+  gap: 1rem;
+  align-items: baseline;
+  padding: 1.1rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.preview-kind {
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.preview-title {
+  font-size: 1rem;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.preview-lock {
+  color: rgba(255, 255, 255, 0.3);
+  text-align: right;
+}
+
+.community-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.6rem;
+  margin-top: clamp(2.5rem, 6vh, 4rem);
+}
+
+.community-note {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.4);
+  margin: 0;
+}
+
+/* ---- Tablet ------------------------------------------------- */
+
+@media (max-width: 1000px) {
+  .service-row {
+    grid-template-columns: 2.6rem minmax(0, 1fr);
+  }
+
+  .service-tags {
+    grid-column: 2;
+    justify-content: flex-start;
+    margin-top: 0.9rem;
+  }
+
+  .community-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---- Mobile ------------------------------------------------- */
+
+@media (max-width: 700px) {
+  .editorial-inner {
+    padding: 0 1.25rem;
+  }
+
+  .service-row {
+    grid-template-columns: 2.2rem minmax(0, 1fr);
+    gap: 1rem;
+  }
+
+  .brief-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .preview-row {
+    grid-template-columns: minmax(0, 1fr) 1rem;
+  }
+
+  .preview-kind {
+    grid-column: 1;
+    display: block;
+    margin-bottom: 0.35rem;
+  }
+
+  .preview-title {
+    grid-column: 1;
+  }
+
+  .community-actions .editorial-button {
+    flex: 1 1 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editorial-link,
+  .editorial-button,
+  .brief-input,
+  .brief-submit {
+    transition: none;
+  }
+}
+
+/* ============================================================
+   Two targeted fixes. Additive only — no existing declaration
+   is edited, and nothing visual changes.
+   ============================================================ */
+
+/* 1. The aperture layers are purely decorative (sky plate, window plate,
+      header type) but each is a full-viewport absolute box with the default
+      pointer-events, so they intercepted every mouse event before it could
+      reach the gallery canvas underneath. None of them contains a link or a
+      control, so making them pointer-transparent changes nothing on screen —
+      it only lets the pointer through to the gallery. */
+.hero-copy,
+.window-container,
+.hero-header {
+  pointer-events: none;
+}
+
+/* 2. Mobile: the plane-scene captions are pinned to opposite edges, which
+      collide on a narrow screen. Stack and centre them instead.
+      `transform` is deliberately untouched — GSAP animates it on these two
+      elements, so overriding it here would fight the entrance animation. */
+@media (max-width: 700px) {
+  .left-text,
+  .right-text {
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: none;
+    padding: 0 1.25rem;
+    text-align: center;
+  }
+
+  .left-text {
+    top: calc(50% - 92px);
+  }
+
+  .right-text {
+    top: calc(50% + 22px);
+  }
+
+  .left-text p {
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+#######################################################################
+PART D — RUN, VERIFY, LIVE PREVIEW (final step, do not skip)
+#######################################################################
+
+1. SCAFFOLD. Create the files above. Confirm every asset listed in PART A.4 is
+   present in public/ — the images and the .glb are ALREADY THERE, look inside
+   public/ and use those exact paths. Then:
+       npm install
+       npx shadcn@latest add @react-bits/CircularGallery-TS-CSS --yes
+       npm run dev
+   Verify http://localhost:3000/ returns 200.
+
+2. FIRST PAINT. Load the page. Expect the loader (name, role, a 1px rule filling
+   left to right) and then, behind it, the cabin wall with the SMALL window,
+   "Yıldız Dikme" top-left, "Creative Developer" top-right, the positioning
+   paragraph bottom-left, "Where ideas become interfaces" bottom-right.
+   Measure:
+       getComputedStyle(document.querySelector('.window-container')).transform
+   -> must be scale 1 (matrix(1, 0, 0, 1, 0, 0)).
+
+3. RELOAD GUARD (BUG 1). In the console:
+       history.scrollRestoration='auto'; window.scrollTo(0, 2600)
+   Reload. Wait 2.5 s so the GLB resolves and the pins register. Then:
+       window.scrollY                                   -> 0
+       history.scrollRestoration                        -> "manual"
+       computed transform of .window-container          -> scale 1
+   The window must NOT open enlarged.
+
+4. APERTURE. Scroll slowly. The window scales 1 -> 4 and its frame leaves the
+   viewport; the header type scales with it and flies past the camera; the cloud
+   plate drifts upward continuously. Pin distance:
+       document.querySelectorAll('.pin-spacer')[0].offsetHeight === innerHeight * 6
+   (100svh of hero + 5 viewports of pin.)
+
+5. GALLERY ENTRANCE. Keep scrolling. At progress 0.30 the aperture is complete
+   and the gallery is still entirely BELOW the viewport; it then slides up and
+   lands by 0.48 in the UPPER band. It must NOT fade, must NOT scale, and must
+   NOT pop into view mid-scene. Its computed opacity is 1 the whole time and
+   `transition-duration` is 0s.
+
+6. GALLERY PERSISTENCE. Keep scrolling to the end of the hero. The gallery stays
+   in place at full opacity while the editorial statement rises underneath it in
+   the LOWER band. Both must be readable. It never fades out. Clearance between
+   the stage bottom and the copy top at a 1100px viewport: ~207px.
+
+7. GALLERY INPUT (BUG 2 — use hit-testing, not synthetic events):
+       const s = document.querySelector('.hero-gallery-stage').getBoundingClientRect();
+       document.elementsFromPoint(s.left + s.width/2, s.top + s.height/2)
+   -> must start with CANVAS, then .circular-gallery, then .hero-gallery-stage.
+   Then, with a REAL mouse: press and drag horizontally across the cards — they
+   move and settle with inertia; release; scroll vertically — the page scrolls
+   normally (Lenis still smooth) and the gallery continues from where you left
+   it rather than snapping back. Cursor over the stage is `grab`, `grabbing`
+   while dragging.
+
+8. NO HITCH (BUG 3). At scroll 0:
+       document.querySelectorAll('.hero-gallery-stage canvas').length  -> 1
+       document.querySelectorAll('canvas').length                      -> 3   (gallery + jet + globe)
+   Scroll through the reveal and re-run: still 1 gallery canvas, and
+   performance.getEntriesByType('resource') has gained NO gallery image entries.
+
+9. JET SCENE. The hero unpins into the pinned jet scene: the business jet rises
+   through the frame, the two captions fade up ("Creative" + "Digital work that
+   moves with intent" on the left, "Technology" on the right), the pale blue
+   background fades to near-black and the caption colour inverts to white.
+   Pin distance: the second .pin-spacer is innerHeight * 2.8.
+
+10. FUNCTIONAL SECTIONS. Below the jet, on #0b0b0c: the numbered Services index
+    (01–05), the enquiry brief, the community tiers, then the footer with its
+    rotating globe. Verify none is clipped:
+        ['services','start','community'].map(id => {
+          const cs = getComputedStyle(document.getElementById(id));
+          return [id, cs.height, cs.overflow, cs.backgroundColor];
+        })
+    -> each height is its real content height (NOT 100svh) and overflow is
+       "visible", background rgb(11, 11, 12).
+    Submitting the brief must show "Nothing was sent — this form is not connected
+    to a backend yet." The community buttons are inert with "Membership opens
+    soon." Footer nav #services and #community must jump to those sections.
+
+11. MOBILE (375x812). No horizontal overflow
+    (document.documentElement.scrollWidth === innerWidth). The jet captions are
+    CENTRED and stacked, not pinned to opposite edges. The gallery still enters
+    and is still draggable; a vertical swipe still scrolls the page. Gallery DPR
+    is 1, jet camera is [0, 5.2, 26] / fov 42.
+
+12. REDUCED MOTION. With prefers-reduced-motion: reduce, `.hero-gallery-static`
+    renders three plain images with captions and NO gallery canvas exists
+    (document.querySelectorAll('canvas').length === 2).
+
+13. QUALITY GATES. All three must pass:
+        npx tsc --noEmit          -> clean
+        npm run build             -> succeeds
+        console                   -> no errors, no hydration warnings
+    `npm run lint` reports pre-existing issues in the vendored CircularGallery
+    (`no-explicit-any`, from upstream) and in tailwind.config.js
+    (`no-require-imports`). Those are expected; do not "fix" vendor code.
+
+14. As the LAST line of your reply, print the clickable live URL on its own line,
+    nothing after it:
+    > Live preview: http://localhost:3000
+
+End of spec. Reproduce value-for-value. Avoid the failures in PART B. Do not
+change the aperture constants, the ap remap, the gallery's no-fade/no-exit
+reveal, the scrollBase + dragOffset composition, the jet normalisation maths, or
+the editorial (non-card) character of the functional sections.

@@ -1,0 +1,1293 @@
+@import "tailwindcss";
+
+/* ============================================================================
+   RODİ MEDYA — TASARIM SİSTEMİ
+   Konsept: "İVME" · Amber-baskın · İmza öğesi: hareket eden ışık
+   Detay: ../../BRIEF.md §6
+   ========================================================================= */
+
+@theme {
+  /* --- Renk ---------------------------------------------------------- */
+  /* ⚠️ RENKLER LOGODAN ÖLÇÜLDÜ, tahmin DEĞİL.
+     Kaynak: Görseller/ChatGPT Image 19 Ağu 2026 12_23_08.png (1254px HD logo)
+     scripts/logo_prep.py piksel sayımı yaptı:
+       #F8B000 → %80.7 (zemin)   #F8F8F8 → %7.2 (ROKET)   #B02070 → %7.8 (MEDYA)
+     Önceki değerler 150px'lik JPG'den göz kararıydı ve ikisi de yanlıştı. */
+  --color-ink: #0b0b0c;
+  --color-ink-soft: #141416;
+  --color-amber: #f8b000;
+  --color-amber-lit: #ffc42a;
+  --color-amber-deep: #d29500;
+  --color-cream: #f7f4ee;
+  --color-cream-warm: #efeae0;
+  /* Magenta ikincil ANA renk — kartvizitte "MEDYA" bu renkte.
+     KOYU bir renk: üzerine beyaz metin 5.9:1 (AA geçer), ink 2.6:1 (geçmez). */
+  --color-magenta: #b02070;
+  --color-magenta-lit: #cc2a84;
+  --color-coral: #e23b2e;
+  --color-corentia: #2563eb;
+
+  /* Sıcak siyah — kartvizitteki doodle ikonların çizgisi saf siyah DEĞİL,
+     sıcak bir kömür tonu. Yalnızca DOLGU yüzeylerde kullanılıyor;
+     okunacak metin --color-ink olarak kalıyor. */
+  --color-ink-warm: #1a1512;
+  --color-ink-line: #3a322c;
+
+  /* --- Köşe yarıçapı ---------------------------------------------------
+     Sitede hiç yarıçap yoktu; her şey keskin köşeli dolu blok olduğu için
+     "Paint çıktısı" gibi duruyordu. Kartvizitin kendi dili yuvarlak:
+     kalp işareti r≈%30, LinkedIn/YouTube kutuları r≈%19. */
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 28px;
+  --radius-xl: 40px;
+  --radius-pill: 999px;
+
+  /* --- Tipografi ------------------------------------------------------ */
+  /* Anybody — wdth 50-150 ekseniyle gerçek poster genişliği */
+  --font-display: var(--font-display-src), "Arial Black", sans-serif;
+  /* Familjen Grotesk — karakterli ama okunabilir */
+  --font-body: var(--font-body-src), system-ui, sans-serif;
+
+  /* --- Kırılma noktaları ---------------------------------------------- */
+  --breakpoint-xs: 30rem;
+}
+
+/* ============================================================================
+   1. IŞIK SİSTEMİ — İMZA ÖĞESİ
+   GSAP her scroll frame'inde --cast-x / --cast-y / --light-t yazar.
+   Gölgeler bunlardan TRANSFORM ile türetilir (box-shadow DEĞİL) —
+   transform compositor'da kalır, repaint tetiklemez.
+   ========================================================================= */
+
+:root {
+  /* Işık YÖNÜ — birimsiz. GSAP bunları yazar.
+     nx: -1 (sağdan ışık, gölge sola) → +1 (soldan ışık, gölge sağa)
+     ny:  0 (tepe ışık, gölge kısa)   → +1 (alçak ışık, gölge uzun)
+
+     ⚠️ NEDEN BİRİMSİZ: sabit px offset ölçek değiştirmez. 150px'lik hero
+     tipografisinde 14px gölge "hayalet metin" gibi okunur, 16px'lik gövde
+     metninde ise devasa görünür. Birimsiz yön + kullanım yerinde birim
+     çarpımı sayesinde gölge her ölçekte doğru oranda kalıyor:
+       kart  → px  (fiziksel UI, sabit derinlik)
+       metin → em  (font boyutuyla birlikte büyür)  */
+  --cast-nx: 0.85;
+  --cast-ny: 0.9;
+
+  /* Kartlar için türetilmiş px offset */
+  --cast-x: calc(var(--cast-nx) * 16px);
+  --cast-y: calc(var(--cast-ny) * 20px);
+
+  /* 0 → 1, sayfa boyunca ışığın yolculuğu. Yüzey tonlaması buna bağlanır. */
+  --light-t: 0;
+
+  /* Yüzey rolleri — .surface-* sınıfları bunları ezer */
+  --bg: var(--color-amber);
+  --fg: var(--color-ink);
+  --rule: color-mix(in srgb, var(--color-ink) 18%, transparent);
+  --muted: color-mix(in srgb, var(--color-ink) 62%, transparent);
+  --cast: color-mix(in srgb, var(--color-ink) 22%, transparent);
+}
+
+/* --- Yüzey kademeleri (BRIEF §6.1) ------------------------------------- */
+
+/* BİRİNCİL — impact. Hero, İstatistik, İletişim */
+.surface-amber {
+  --bg: var(--color-amber);
+  --fg: var(--color-ink);
+  --rule: color-mix(in srgb, var(--color-ink) 18%, transparent);
+  --muted: color-mix(in srgb, var(--color-ink) 62%, transparent);
+  --cast: color-mix(in srgb, var(--color-ink) 22%, transparent);
+}
+
+/* İKİNCİL — okuma. Manifesto, Süreç. Uzun metin burada yaşar. */
+.surface-cream {
+  --bg: var(--color-cream);
+  --fg: var(--color-ink);
+  --rule: color-mix(in srgb, var(--color-ink) 14%, transparent);
+  --muted: color-mix(in srgb, var(--color-ink) 58%, transparent);
+  --cast: color-mix(in srgb, var(--color-ink) 14%, transparent);
+}
+
+/* ÜÇÜNCÜL — noktalama. Kısa ve dramatik, toplam scroll'un %25'ini geçme. */
+.surface-ink {
+  --bg: var(--color-ink);
+  --fg: var(--color-cream);
+  --rule: color-mix(in srgb, var(--color-cream) 16%, transparent);
+  --muted: color-mix(in srgb, var(--color-cream) 60%, transparent);
+  --cast: color-mix(in srgb, #000 45%, transparent);
+}
+
+.surface-amber,
+.surface-cream,
+.surface-ink {
+  background-color: var(--bg);
+  color: var(--fg);
+}
+
+/* ============================================================================
+   2. TEMEL
+   ========================================================================= */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* Lenis smooth scroll'u yönetiyor — CSS smooth ile ÇAKIŞIR, açma. */
+  scroll-behavior: auto;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-amber);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.55;
+  font-synthesis-weight: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Grain — markanın basılı/kağıt hissini dijitale taşır (BRIEF §6.3).
+   Dokusuz düz amber amatör durur; bu load-bearing. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.042;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+img,
+svg,
+video {
+  display: block;
+  max-width: 100%;
+}
+
+::selection {
+  background: var(--color-ink);
+  color: var(--color-amber);
+}
+
+.surface-ink ::selection {
+  background: var(--color-amber);
+  color: var(--color-ink);
+}
+
+/* Odak halkası — her yüzeyde görünür kalmalı (WCAG 2.4.7) */
+:focus-visible {
+  outline: 3px solid var(--fg);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+/* ============================================================================
+   3. TİPOGRAFİ
+   Display: Archivo (wght 800-900 + wdth 110-125 → Expanded Black)
+   Gövde:   Instrument Sans
+   ========================================================================= */
+
+/* Archivo'nun wdth ekseni 62–125 (Anybody'nin 150'si değil — font
+   değiştirildi, bkz. app/layout.tsx). Geniş ayar poster hissini kuruyor,
+   ama dar ekranda geniş tipografi satırları kırar; wdth responsive daralıyor.
+   ⚠️ 125 üstü değer yazma — eksen orada bitiyor, sessizce kırpılır. */
+/* ⚠️ AĞIRLIK 900 DEĞİL 800.
+   Sitedeki neredeyse her başlık 900'dü; sonuç hiyerarşisi olmayan, sürekli
+   bağıran bir sayfaydı. 900 artık sadece İKİ yerde hak ediliyor:
+   hero başlığı ve istatistik rakamları (aşağıda geri veriliyor). */
+.t-display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-variation-settings: "wdth" 100;
+  line-height: 0.88;
+  letter-spacing: -0.022em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+/* 900'ün hak edildiği tek iki yer */
+.t-hero,
+.t-numeral {
+  font-weight: 900;
+}
+
+@media (min-width: 48rem) {
+  .t-display {
+    font-variation-settings: "wdth" 112;
+  }
+}
+
+@media (min-width: 80rem) {
+  .t-display {
+    font-variation-settings: "wdth" 122;
+  }
+}
+
+/* Hero ölçeği — ekranı dolduran poster tipografisi.
+   ⚠️ HEM genişlik HEM yükseklik sınırlı. Sadece vw kullanmak 1536x864 gibi
+   BASIK ekranlarda (1920x1080 @ %125 zoom) taşmaya yol açıyordu: en uzun
+   satır "FİKİRLERİMİZ" ikiye bölünüyor, 4 satır oluyor ve lede + CTA
+   ekranın altında kalıyordu.
+     - 9.2vw  : en uzun satırın tek satırda kalmasını garantiler
+     - 15svh  : basık ekranda yüksekliği sınırlar
+   min() ikisinden hangisi küçükse onu alır. */
+.t-hero {
+  /* Mobil alt sınır: 390px ekranda "FİKİRLERİMİZ" (en uzun satır, 12 karakter)
+     wdth 108'de yatay olarak tam oturan en büyük değer. Ölçülerek bulundu —
+     daha büyüğü taşırıyor, daha küçüğü ekranı boş bırakıyor. */
+  font-size: clamp(3rem, min(9.2vw, 15svh), 11rem);
+}
+
+/* Dar ekranda dikey boşluk bol: yükseklik sınırını gevşetip tipografiyi
+   ekranı dolduracak kadar büyüt. */
+@media (max-width: 47.99rem) {
+  .t-hero {
+    font-size: clamp(3rem, 12.5vw, 5rem);
+  }
+}
+
+/* Hero satırları asla kırılmaz — kırılırsa yükseklik hesabı bozulur */
+.t-hero > * {
+  white-space: nowrap;
+}
+
+.t-section {
+  font-size: clamp(2.2rem, 6.2vw, 5.2rem);
+}
+
+.t-sub {
+  font-size: clamp(1.4rem, 3vw, 2.6rem);
+}
+
+/* Mikro-etiket — markanın postlarındaki geniş aralıklı etiket dili.
+   Display ailesi ama dar ayarda: geniş harf + geniş tracking okunmaz olur. */
+.t-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variation-settings: "wdth" 88;
+  font-size: clamp(0.66rem, 0.85vw, 0.76rem);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  line-height: 1.25;
+}
+
+/* Manifesto — sayfadaki TEK ortalanmış, dar ölçülü, küçük-harf metin.
+   Hero 141px'te bağırırken burası 40px'te fısıldıyor. */
+.manifesto-text {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-variation-settings: "wdth" 78;
+  font-size: clamp(1.35rem, 2.6vw, 2.6rem);
+  line-height: 1.28;
+  letter-spacing: -0.015em;
+  text-transform: none;
+  text-wrap: pretty;
+  max-width: 34ch;
+  margin: 0;
+}
+
+@media (max-width: 47.99rem) {
+  .manifesto-text {
+    max-width: 26ch;
+    font-size: clamp(1.35rem, 5.4vw, 1.8rem);
+  }
+}
+
+.t-lede {
+  font-size: clamp(1.05rem, 1.5vw, 1.35rem);
+  line-height: 1.5;
+  max-width: 54ch;
+}
+
+.t-body {
+  font-size: clamp(0.98rem, 1.1vw, 1.08rem);
+  line-height: 1.62;
+  max-width: 62ch;
+}
+
+/* Devasa rakam — "59 milyon" postunun enerjisi.
+   Sayfanın EN BÜYÜK tipografisi: istatistik bölümünün başlığı yok,
+   rakamların kendisi başlık. */
+/* ⚠️ 15vw ÇOK BÜYÜKTÜ: 1536px ekranda 230px'e çıkıyor, tek bir rakam
+   ekranın yarısını yiyor, üstü kırpılıyor ve sağdaki açıklama metni
+   arka planın koyu gölge bölgesinde kalıp okunmaz hale geliyordu.
+   8.5vw = 130px: hâlâ sayfanın en büyük tipografisi ama satır tek
+   ekrana sığıyor ve açıklamaya yer kalıyor. */
+.t-numeral {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-variation-settings: "wdth" 118;
+  font-variant-numeric: tabular-nums;
+  line-height: 0.85;
+  letter-spacing: -0.035em;
+  font-size: clamp(3rem, 8.5vw, 8.5rem);
+}
+
+@media (min-width: 48rem) {
+  .t-numeral {
+    font-variation-settings: "wdth" 125; /* Archivo ekseninin sonu */
+  }
+}
+
+/* Birim ("mn", "saat") rakamın parçası değil, ona ait bir not.
+   Aynı puntoda yazıldığında satır komşu sütuna taşıp üzerine biniyordu
+   ("55,8 mn" + "9,5 saat" → okunamaz "55,69,5" çakışması). */
+.t-numeral-unit {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variation-settings: "wdth" 100;
+  font-size: clamp(0.9rem, 1.4vw, 1.25rem);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+/* ============================================================================
+   4. GÖLGE — ışıktan türetilen, transform tabanlı
+   Marka fotoğraflarındaki gölgeler SERT kenarlı (blur yok) — birebir o dil.
+   ========================================================================= */
+
+/* Kart / görsel için: arkasında dolu renk kopyası, ışığa göre kaymış */
+.cast {
+  position: relative;
+  isolation: isolate;
+}
+
+.cast::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--cast);
+  border-radius: inherit;
+  transform: translate3d(var(--cast-x), var(--cast-y), 0);
+  will-change: transform;
+}
+
+/* Daha kısa gölge isteyen öğeler */
+.cast-sm::after {
+  transform: translate3d(
+    calc(var(--cast-x) * 0.45),
+    calc(var(--cast-y) * 0.45),
+    0
+  );
+}
+
+/* Metin gölgesi — CastText bileşeni tarafından kullanılır.
+   text-shadow DEĞİL: ayrı bir katman + transform (repaint yok). */
+.cast-text {
+  position: relative;
+  display: block;
+  isolation: isolate;
+}
+
+/* Metin gölgesi EM tabanlı — font boyutuyla birlikte ölçeklenir.
+   Sabit px olsaydı 150px'lik hero'da hayalet metin, 16px'lik gövdede
+   devasa görünürdü. 0.045em sıkı ve kesin bir offset veriyor: markanın
+   posterlerindeki sert gölgenin dili. */
+.cast-text__shadow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  color: var(--cast);
+  transform: translate3d(
+    calc(var(--cast-nx) * 0.045em),
+    calc(var(--cast-ny) * 0.055em),
+    0
+  );
+  will-change: transform;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* CastText compact — küçük tipografide daha da sıkı */
+.cast-text__shadow.cast-sm {
+  transform: translate3d(
+    calc(var(--cast-nx) * 0.025em),
+    calc(var(--cast-ny) * 0.03em),
+    0
+  );
+}
+
+/* ============================================================================
+   4b. ÜST BAR
+   Bar, üzerinden geçtiği yüzeye ait bir plaka gibi davranır: amber/krem/ink
+   ritmiyle birlikte renk değiştirir. Header.tsx data-surface yazar.
+   ========================================================================= */
+
+:root {
+  --nav-h: 76px;
+}
+
+/* Kullanıcının gerçek ekranı: 1920x1080 @ %125 zoom = 1536x864 CSS px.
+   Basık ekranda 76px bar dikey alanın %9'unu yiyordu. */
+@media (min-width: 80rem) and (max-height: 56.25rem) {
+  :root {
+    --nav-h: 64px;
+  }
+}
+
+@media (max-width: 47.99rem) {
+  :root {
+    --nav-h: 68px;
+  }
+}
+
+@media (max-width: 30rem) {
+  :root {
+    --nav-h: 60px;
+  }
+}
+
+.nav-bar {
+  height: var(--nav-h);
+  color: var(--fg);
+  /* Sayfanın en üstünde ŞEFFAF: düz amber plaka, altındaki dokulu hero
+     görseliyle arasında sert bir dikiş oluşturuyordu ve bar sayfaya ait
+     değil, üstüne yapıştırılmış gibi duruyordu. Kaydırınca yüzeyini
+     kazanıyor. */
+  background-color: transparent;
+  /* `all` DEĞİL — sadece gerçekten değişen property'ler. */
+  transition:
+    background-color 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 260ms linear;
+  border-bottom: 1px solid transparent;
+}
+
+.nav-bar[data-scrolled="true"] {
+  background-color: var(--bg);
+  border-bottom-color: var(--rule);
+}
+
+.nav-bar[data-surface="amber"] {
+  --bg: var(--color-amber);
+  --fg: var(--color-ink);
+  --rule: color-mix(in srgb, var(--color-ink) 22%, transparent);
+}
+
+.nav-bar[data-surface="cream"] {
+  --bg: var(--color-cream);
+  --fg: var(--color-ink);
+  --rule: color-mix(in srgb, var(--color-ink) 16%, transparent);
+}
+
+.nav-bar[data-surface="ink"] {
+  --bg: var(--color-ink);
+  --fg: var(--color-cream);
+  --rule: color-mix(in srgb, var(--color-cream) 20%, transparent);
+}
+
+/* Çapa hedefleri sabit barın altında kalmasın */
+[id] {
+  scroll-margin-top: calc(var(--nav-h) + 24px);
+}
+
+/* --- Menü bağlantısı: markanın kendi highlighter aygıtı ------------------
+   Büyüyen alt çizgi web'in en klişe hover'ıydı. Bu blok vurgu ise
+   postlarındaki "kelimenin arkasında dolu renk" dilinin birebir karşılığı.
+   --fg/--bg kullandığı için üç yüzeyde de kendiliğinden ters çeviriyor. */
+.nav-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px; /* dokunma hedefi */
+  padding-inline: 2px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-variation-settings: "wdth" 92;
+  font-size: 0.78rem;
+  letter-spacing: 0.13em;
+  line-height: 1;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: inherit;
+  touch-action: manipulation;
+}
+
+.nav-link::before {
+  content: "";
+  position: absolute;
+  inset: -5px -9px;
+  border-radius: 6px;
+  background: var(--fg);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 180ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.nav-link__text {
+  position: relative;
+  transition: color 120ms ease 60ms;
+}
+
+.nav-link:hover::before,
+.nav-link:focus-visible::before {
+  transform: scaleX(1);
+}
+
+.nav-link:hover .nav-link__text,
+.nav-link:focus-visible .nav-link__text {
+  color: var(--bg);
+}
+
+/* Aktif bölüm — dört bağlantı var, hangisinde olduğun belli olmalıydı */
+.nav-link[aria-current="location"]::before {
+  transform: scaleX(1);
+  opacity: 0.14;
+}
+
+.nav-link[aria-current="location"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  height: 2px;
+  background: var(--fg);
+}
+
+.nav-link:focus-visible {
+  outline-offset: 6px;
+}
+
+/* --- CTA ---------------------------------------------------------------
+   ⚠️ DOLU SİYAH DİKDÖRTGEN DEĞİL. Önceki hali her yüzeyin üstünde duran
+   sert bir blok'tu. Artık ana hatlı (outlined) ve yuvarlatılmış; hover'da
+   doluyor — jest hover'da gerçekleşiyor, durağan halde değil. */
+.nav-cta {
+  align-items: center;
+  padding: 12px 22px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--fg);
+  border: 2px solid var(--fg);
+  text-decoration: none;
+  touch-action: manipulation;
+  transition:
+    background-color 180ms ease-out,
+    color 180ms ease-out,
+    transform 180ms ease-out;
+}
+
+.nav-cta:hover {
+  background: var(--fg);
+  color: var(--bg);
+  transform: translate3d(0, -2px, 0);
+}
+
+/* --- Hamburger ---------------------------------------------------------- */
+/* ⚠️ ÖZGÜLLÜK TUZAĞI: burada `display: grid` yazıp JSX'te `md:hidden`
+   kullanmak ÇALIŞMAZ. İkisi de tek-sınıf özgüllüğünde; Tailwind
+   `@import` ile dosyanın en üstünde, bu kural altta → bu kazanır ve
+   hamburger masaüstünde de görünür kalır. Görünürlük tek yerden,
+   media query ile yönetiliyor. */
+.nav-burger {
+  display: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  /* Dolu siyah kare → ana hatlı daire. Kartvizitin yuvarlak dili. */
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--fg);
+  border: 2px solid var(--fg);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    background-color 180ms ease-out,
+    color 180ms ease-out;
+}
+
+.nav-burger[aria-expanded="true"] {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+@media (max-width: 47.99rem) {
+  .nav-burger {
+    display: grid;
+  }
+}
+
+.nav-burger__box {
+  display: grid;
+  gap: 4px;
+  width: 20px;
+}
+
+.nav-burger__box > span {
+  display: block;
+  height: 2px;
+  width: 100%;
+  background: currentColor;
+  transition: transform 240ms cubic-bezier(0.65, 0, 0.35, 1),
+    opacity 160ms linear;
+}
+
+.nav-burger__box[data-open="true"] > span:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.nav-burger__box[data-open="true"] > span:nth-child(2) {
+  opacity: 0;
+  transform: scaleX(0);
+}
+
+.nav-burger__box[data-open="true"] > span:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+/* ============================================================================
+   4c. FOOTER
+   ========================================================================= */
+
+.footer-link {
+  display: inline-block;
+  min-height: 32px;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  text-decoration: none;
+  color: inherit;
+  opacity: 0.75;
+  transition: opacity 160ms ease-out;
+}
+
+.footer-link:hover {
+  opacity: 1;
+}
+
+/* WhatsApp plakası — amber zeminde ink metin (10.3:1).
+   Ters kombinasyon (amber metin) 1.9:1 verir ve AA'yı geçemez. */
+.footer-plate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 18px 24px;
+  border-radius: var(--radius-md);
+  background: var(--color-amber);
+  color: var(--color-ink);
+  text-decoration: none;
+  touch-action: manipulation;
+  transition:
+    background-color 160ms ease-out,
+    transform 160ms ease-out;
+}
+
+/* Işığa doğru kalkış — cast-nx ışığın yönünü verir, plaka ona doğru gidiyor */
+.footer-plate:hover {
+  background: var(--color-amber-lit);
+  transform: translate3d(calc(var(--cast-nx) * -2px), -2px, 0);
+}
+
+/* ============================================================================
+   4h. HİZMET KARTLARI
+   Önceki hali: keskin köşeli koyu dikdörtgen + kare BÜYÜK HARF etiketler.
+   Yeni hali: krem kağıt + içeriden yerleştirilmiş fotoğraf — kartvizitin
+   beyaz bant / beyaz bulut malzemesi.
+   ========================================================================= */
+
+.svc {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  border-radius: var(--radius-lg);
+  background: var(--color-cream);
+  color: var(--color-ink);
+  border: 2px solid color-mix(in srgb, var(--color-ink) 10%, transparent);
+  overflow: hidden;
+  transition:
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 260ms ease-out;
+}
+
+@media (min-width: 56.25rem) {
+  .svc {
+    width: min(27rem, 78vw);
+    /* 62vh → 58vh: 864px ekranda başlık bloğuyla birlikte taşıyordu */
+    height: 58vh;
+    min-height: 25rem;
+  }
+}
+
+/* Fotoğraf kartın kenarına DAYANMIYOR, içeriden yerleşiyor —
+   kartvizitte de beyaz bant zeminin içinde duruyor, kenarına taşmıyor. */
+.svc__photo {
+  position: relative;
+  margin: 10px 10px 0;
+  border-radius: 20px;
+  overflow: hidden;
+  aspect-ratio: 5 / 4;
+  flex: 1 1 auto;
+}
+
+.svc__photo img {
+  transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.svc__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px 22px;
+}
+
+/* BÜYÜK HARF DEĞİL. Altı kart × büyük harf başlık sürekli bağırıyordu. */
+.svc__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variation-settings: "wdth" 100;
+  font-size: clamp(1.2rem, 2.2vw, 1.55rem);
+  line-height: 1.08;
+  letter-spacing: -0.012em;
+  text-transform: none;
+}
+
+.svc__summary {
+  margin: 0;
+  max-width: 32ch;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--color-ink) 68%, transparent);
+}
+
+/* Kare + büyük harf + 0.2em aralık + ağırlık 700 → hap + cümle düzeni +
+   ağırlık 500. 24 adet etiketin görsel gürültüsü yarıya iniyor. */
+.svc__chip {
+  border-radius: var(--radius-pill);
+  padding: 6px 14px;
+  background: color-mix(in srgb, var(--color-ink) 6%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--color-ink) 12%, transparent);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.78rem;
+  letter-spacing: 0.005em;
+  text-transform: none;
+  color: color-mix(in srgb, var(--color-ink) 72%, transparent);
+}
+
+/* -0.6deg: tek derecelik kusur, el yapımı hissinin taşıyıcısı.
+   Sadece transform — reflow yok, compositor'da kalıyor. */
+@media (hover: hover) {
+  .svc:hover {
+    transform: translate3d(0, -6px, 0) rotate(-0.6deg);
+    border-color: var(--color-magenta);
+  }
+
+  .svc:hover .svc__photo img {
+    transform: scale(1.045);
+  }
+}
+
+/* ============================================================================
+   4g. BUTONLAR + YIRTIK BANT
+   Sitedeki tüm butonlar keskin köşeli dolu siyah dikdörtgendi ("Paint").
+   ========================================================================= */
+
+.btn-solid {
+  display: inline-flex;
+  width: fit-content;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.75rem;
+  border-radius: var(--radius-md);
+  /* Saf siyah değil sıcak kömür — kartvizitin çizgi rengi de böyle */
+  background: var(--color-ink-warm);
+  color: var(--color-cream);
+  text-decoration: none;
+  touch-action: manipulation;
+  transition:
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 200ms ease-out;
+}
+
+@media (min-width: 40rem) {
+  .btn-solid {
+    padding: 1.15rem 2.1rem;
+  }
+}
+
+.btn-solid:hover {
+  background: var(--color-ink);
+  transform: translate3d(0, -3px, 0);
+}
+
+/* İkincil eylem hap biçiminde — dolu = ana eylem, hap = alternatif.
+   Bilinçli asimetri: iki buton aynı biçimde olunca hangisinin ana eylem
+   olduğu okunmuyordu. */
+.btn-outline {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 1rem 1.75rem;
+  border-radius: var(--radius-pill);
+  border: 2px solid currentColor;
+  text-decoration: none;
+  touch-action: manipulation;
+  transition:
+    background-color 200ms ease-out,
+    color 200ms ease-out,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (min-width: 40rem) {
+  .btn-outline {
+    padding: 1.15rem 2.1rem;
+  }
+}
+
+.btn-outline:hover {
+  background: var(--color-ink);
+  color: var(--color-cream);
+  transform: translate3d(0, -3px, 0);
+}
+
+/* --- YIRTIK BANT --------------------------------------------------------
+   Kartvizitteki beyaz yırtık şerit. Görsel DEĞİL, saf CSS: clip-path ile
+   düzensiz kenar + hafif eğim. Sadece İKİ yerde kullanılıyor (hero etiketi
+   ve iletişim telefonu) — üçüncüsü tekrar olur ve numarayı öldürür. */
+.tape {
+  position: relative;
+  display: inline-block;
+  padding: 9px 24px 10px;
+  background: #f8f8f8;
+  color: var(--color-ink);
+  transform: rotate(-1.4deg);
+  clip-path: polygon(
+    1.4% 3%,
+    0 21%,
+    2% 37%,
+    0.4% 58%,
+    2.2% 76%,
+    0.6% 95%,
+    98.8% 100%,
+    100% 83%,
+    97.8% 65%,
+    99.6% 44%,
+    97.6% 25%,
+    99.2% 2%
+  );
+}
+
+.tape > * {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* ============================================================================
+   4f. CORENTIA SAYFASI
+   Mavi (#2563EB) ink üzerinde 3.8:1 verir — metin için AA'yı GEÇMEZ.
+   Bu yüzden yalnızca çizgi, kenarlık ve işaret olarak kullanılıyor;
+   okunması gereken hiçbir metin mavi değil.
+   ========================================================================= */
+
+.corentia-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 6px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variation-settings: "wdth" 100;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  color: var(--fg);
+  border-bottom: 2px solid var(--color-corentia);
+  transition: gap 200ms ease-out;
+}
+
+.corentia-cta:hover {
+  gap: 16px;
+}
+
+.corentia-row {
+  display: grid;
+  gap: 0.4rem 2.5rem;
+  padding-block: 1.5rem;
+  border-top: 1px solid var(--rule);
+}
+
+@media (min-width: 48rem) {
+  .corentia-row {
+    grid-template-columns: minmax(0, 18rem) minmax(0, 1fr);
+    align-items: baseline;
+  }
+}
+
+.corentia-row__name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variation-settings: "wdth" 100;
+  font-size: clamp(1.1rem, 1.6vw, 1.35rem);
+  line-height: 1.2;
+}
+
+/* Sayfanın merkezi — soldan mavi çizgiyle işaretli */
+.corentia-highlight {
+  padding-left: clamp(1.25rem, 3vw, 2.5rem);
+  border-left: 3px solid var(--color-corentia);
+}
+
+/* ============================================================================
+   4e. SÜREÇ — rampa
+   4 sütunlu grid adımları yan yana koyuyordu, yani SIRAYI göstermiyordu.
+   Burada her adım bir öncekinden daha sağda başlıyor: sıra kompozisyonun
+   kendisinde okunuyor. "İVME" yapısal hale geliyor.
+   ========================================================================= */
+
+.process-step {
+  position: relative;
+  /* Her adım bir öncekinden 5.5vw daha sağda — düşen rampa */
+  margin-left: calc(var(--i) * 5.5vw);
+  padding-block: clamp(1.5rem, 3.5vh, 2.6rem);
+  border-top: 1px solid var(--rule);
+}
+
+.process-step:first-child {
+  border-top: 0;
+}
+
+/* Numara başlığın ARKASINDA — dekoratif plaka, okunacak bilgi değil.
+   Sıra bilgisi zaten <ol> semantiğinde var, o yüzden aria-hidden. */
+.process-numeral {
+  position: absolute;
+  left: -0.06em;
+  top: calc(clamp(1.5rem, 3.5vh, 2.6rem) - 0.24em);
+  z-index: -1;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-variation-settings: "wdth" 125;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(4.5rem, 11vw, 10rem);
+  line-height: 0.8;
+  letter-spacing: -0.05em;
+  opacity: 0.16;
+  pointer-events: none;
+  user-select: none;
+}
+
+.process-body {
+  padding-left: clamp(0.5rem, 3vw, 3.5rem);
+}
+
+.process-title {
+  margin: 0 0 0.6rem;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-variation-settings: "wdth" 88;
+  font-size: clamp(1.35rem, 2.2vw, 2.1rem);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 47.99rem) {
+  .process-step {
+    /* Dar ekranda rampa 5.5vw yerine sabit küçük adım — yoksa dördüncü
+       adım ekranın dışına taşar. */
+    margin-left: calc(var(--i) * 12px);
+  }
+
+  /* Mobilde numara arkada değil, başlığın üstünde satır içi:
+     küçük ekranda arkadaki dev numara metni okunmaz hale getiriyor. */
+  .process-numeral {
+    position: static;
+    display: block;
+    font-size: 3.2rem;
+    opacity: 0.22;
+    margin-bottom: 0.2rem;
+  }
+
+  .process-body {
+    padding-left: 0;
+  }
+}
+
+/* ============================================================================
+   4d. SIKÇA SORULANLAR — dizin düzeni
+   Yapışkan başlık rayı KALDIRILDI: sayfa kaydıkça soruların üzerine binip
+   metni okunmaz hale getiriyordu.
+   ========================================================================= */
+
+.faq-summary {
+  display: grid;
+  grid-template-columns: 3.25rem minmax(0, 1fr) 2.25rem;
+  align-items: start;
+  gap: 1rem;
+  padding-block: 1.5rem;
+  padding-inline: 1rem;
+  margin-inline: -1rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.faq-summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq-index {
+  padding-top: 0.35em;
+  opacity: 0.4;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sayfadaki TEK cümle düzeni (küçük harf) display tipografisi.
+   Diğer tüm başlıklar BÜYÜK HARF — bu fark bölümü ayırıyor. */
+.faq-question {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-variation-settings: "wdth" 92;
+  font-size: clamp(1.05rem, 1.7vw, 1.55rem);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-transform: none;
+}
+
+/* Çıplak kare kutu → ana hatlı daire */
+.faq-toggle {
+  display: grid;
+  place-items: center;
+  height: 2.25rem;
+  width: 2.25rem;
+  margin-top: 0.05em;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--rule);
+  transition: border-color 200ms ease-out;
+}
+
+.faq-item[open] .faq-toggle {
+  border-color: var(--color-magenta);
+}
+
+/* Açık satırın dizin numarası magenta — hangi soruda olduğun belli olsun */
+.faq-item[open] .faq-index {
+  color: var(--color-magenta);
+  opacity: 1;
+}
+
+.faq-summary {
+  border-radius: var(--radius-md);
+  transition: background-color 180ms ease-out;
+}
+
+.faq-summary:hover {
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+
+.faq-answer {
+  grid-column: 2;
+  margin: 0 0 1.75rem;
+  padding-left: 4.25rem;
+  max-width: 62ch;
+  font-size: clamp(0.95rem, 1.05vw, 1.05rem);
+  line-height: 1.62;
+  opacity: 0.75;
+}
+
+@media (max-width: 47.99rem) {
+  .faq-summary {
+    grid-template-columns: 2.25rem minmax(0, 1fr) 1.5rem;
+    gap: 0.75rem;
+  }
+
+  .faq-answer {
+    padding-left: 3rem;
+  }
+}
+
+/* Yumuşak açılma — destekleyen tarayıcılarda. Desteklemeyende anında açılır,
+   işlevsellik aynı. JS yok. */
+@supports (interpolate-size: allow-keywords) {
+  :root {
+    interpolate-size: allow-keywords;
+  }
+
+  .faq-item::details-content {
+    height: 0;
+    overflow: clip;
+    transition:
+      height 320ms cubic-bezier(0.22, 1, 0.36, 1),
+      content-visibility 320ms allow-discrete;
+  }
+
+  .faq-item[open]::details-content {
+    height: auto;
+  }
+}
+
+/* ============================================================================
+   5. DÜZEN
+   ========================================================================= */
+
+.shell {
+  width: 100%;
+  max-width: 88rem;
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 5vw, 4.5rem);
+}
+
+.section-pad {
+  padding-block: clamp(5rem, 13vh, 10rem);
+}
+
+.rule {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 0;
+}
+
+/* Highlighter vurgu — postlardaki "dolu blok arkasında kelime" dili.
+   ⚠️ SİYAH DEĞİL MAGENTA. Siyah blok sayfadaki en sert öğeydi ("Paint")
+   ve magenta kartvizitte "MEDYA"nın rengiyken sitede hiç kullanılmıyordu.
+   Kontrast: beyaz üzerine magenta 5.9:1 (AA geçer). Ink 2.6:1 — geçmez,
+   o yüzden metin beyaz. */
+.mark {
+  background: var(--color-magenta);
+  color: #f8f8f8;
+  border-radius: var(--radius-sm);
+  padding: 0.04em 0.22em 0.1em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.surface-ink .mark {
+  background: var(--color-amber);
+  color: var(--color-ink);
+}
+
+/* Eğik şerit — postlardaki skew'li amber/siyah bant */
+.skew-band {
+  transform: skewY(-2.2deg);
+}
+
+.skew-band > * {
+  transform: skewY(2.2deg);
+}
+
+/* ============================================================================
+   6. ANİMASYON GİRİŞ DURUMLARI
+   GSAP devralmadan önceki ilk-frame durumu. JS kapalıysa içerik yine görünür
+   (aşağıdaki .no-js kuralı) — içerik asla animasyona bağımlı kalmaz.
+   ========================================================================= */
+
+[data-anim="rise"] {
+  opacity: 0;
+  transform: translate3d(0, 2.5rem, 0);
+}
+
+[data-anim="fade"] {
+  opacity: 0;
+}
+
+[data-anim="clip"] {
+  clip-path: inset(100% 0 0 0);
+}
+
+/* Hero — başlangıç gizleme SADECE JS varken.
+   `scripting: enabled` desteklenmeyen/JS kapalı durumda metin görünür kalır,
+   yani içerik hiçbir zaman animasyona bağımlı olmaz. */
+@media (scripting: enabled) {
+  [data-hero-line],
+  [data-hero-fade] {
+    opacity: 0;
+  }
+
+  [data-hero-fade] {
+    transform: translate3d(0, 1.6rem, 0);
+  }
+}
+
+/* SplitText karakterleri — yPercent için inline-block şart */
+.hero-char {
+  display: inline-block;
+  will-change: transform, opacity;
+}
+
+/* ============================================================================
+   7. ERİŞİLEBİLİRLİK
+   ========================================================================= */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10000;
+  transform: translateY(-120%);
+  background: var(--color-ink);
+  color: var(--color-amber);
+  padding: 0.9rem 1.4rem;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.8rem;
+  transition: transform 0.18s ease;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+/* Azaltılmış hareket: ışık sabitlenir, gölgeler KALIR (tasarımın parçası),
+   giriş animasyonları anında tamamlanmış duruma düşer. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --cast-nx: 0.7;
+    --cast-ny: 0.8;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  [data-anim],
+  [data-hero-line],
+  [data-hero-fade] {
+    opacity: 1 !important;
+    transform: none !important;
+    clip-path: none !important;
+  }
+
+  .cast::after,
+  .cast-text__shadow {
+    will-change: auto;
+  }
+}

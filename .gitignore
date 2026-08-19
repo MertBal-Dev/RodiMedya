@@ -1,0 +1,47 @@
+# Bağımlılıklar
+node_modules/
+.pnp
+.pnp.*
+
+# Next.js
+.next/
+out/
+build/
+next-env.d.ts
+
+# Ortam değişkenleri — ASLA commit edilmez
+.env
+.env.*
+!.env.example
+
+# Doğrulama betiklerinin ürettiği ekran görüntüleri (scripts/verify.mjs)
+site/shots/
+site/shots-sections/
+
+# Kök public/ — KOPYA, depoya girmemeli.
+# GORSEL-PROMPTLARI.md dosya yollarını "public/img/..." diye yazıyordu ve
+# görseller köke de kopyalanmış. Uygulama site/public/ içinden okuyor;
+# buradaki 30 dosyanın hepsi orada da mevcut. Diskte duruyorlar, sadece
+# sürüm kontrolüne alınmıyorlar (~15 MB tasarruf).
+/public/
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+
+# Günlükler
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# İşletim sistemi
+.DS_Store
+Thumbs.db
+*.pem
+
+# Editör
+.idea/
+*.swp

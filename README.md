@@ -17,17 +17,38 @@ Bu ayar yapılmazsa Vercel kökte `package.json` bulamaz ve derleme başarısız
 
 Geri kalan her şey otomatik algılanır (Framework: Next.js, Build: `next build`).
 
-### Alan adı bağlama
-Alan adı şu an Natro'da ve `ns1.natrohost.com` / `ns2.natrohost.com` DNS
-sunucularını kullanıyor; mevcut hosting "WP Profesyonel". Vercel'e yönlendirmek
-için Natro panelinden DNS kaydı eklenmeli:
+### Alan adı bağlama (rodimedya.com → Vercel)
 
-| Tip | Ad | Değer |
-|---|---|---|
-| A | `@` | `76.76.21.21` |
-| CNAME | `www` | `cname.vercel-dns.com` |
+Alan adı Natro'da, `ns1.natrohost.com` / `ns2.natrohost.com` DNS sunucularını
+kullanıyor; mevcut hosting "WP Profesyonel".
 
-(Vercel panelindeki güncel değerleri esas al — yukarıdakiler tipik değerlerdir.)
+**Önerilen yol: DNS'i Natro'da bırak, sadece iki kayıt değiştir.** Nameserver
+değiştirmekten daha düşük riskli ve geri alması kolay.
+
+Natro panelinde **DNS Yönetimi**:
+
+| Tip | Ad | Değer | TTL |
+|---|---|---|---|
+| A | `@` | `76.76.21.21` | 3600 |
+| CNAME | `www` | `cname.vercel-dns-0.com` | 3600 |
+
+Varsa eski `A @` ve `CNAME www` kayıtlarını **sil** (WordPress hosting'e
+bakıyorlar), yenilerini ekle.
+
+> ⚠️ **Kesin değerleri Vercel panelinden al.** Yukarıdakiler genel değerlerdir;
+> Vercel projeye özel değer gösterebiliyor ve CNAME adresi geçmişte değişti
+> (`cname.vercel-dns.com` → `cname.vercel-dns-0.com`). Vercel'de
+> **Project → Settings → Domains → Add** dediğinde ekranda tam olarak hangi
+> kaydı gireceğini yazıyor — onu esas al.
+
+**Ayrıca:** Natro'daki **"Park Sayfası"nı kapat.** Açık kalırsa alan adı
+Vercel yerine park sayfasına gidebilir.
+
+**E-posta etkilenmez:** iletişim adresi Gmail (`roketdijitalmedya@gmail.com`),
+alan adına bağlı bir posta kutusu yok — yani MX kaydı riski taşımıyoruz.
+
+Yayılma genelde 5–30 dakika, en fazla birkaç saat. Vercel SSL sertifikasını
+kayıtları doğruladıktan sonra otomatik üretir.
 
 ---
 

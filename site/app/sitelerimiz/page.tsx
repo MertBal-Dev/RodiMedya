@@ -42,24 +42,6 @@ const PROJECTS = [
     metric: "16 Ay Elden Taksit • 9 Showroom",
   },
   {
-    id: "bursacagdashurda",
-    title: "Bursa Çağdaş Hurda — Metal & Geri Dönüşüm Platformu",
-    client: "Çağdaş Hurda Metal",
-    sector: "Sanayi, Hurda & Geri Dönüşüm (Bursa)",
-    summary:
-      "Bursa sanayisine yönelik metal ve hurda alım satımını dijitale taşıyan; canlı fiyat hesaplayıcı, anında WhatsApp ekspertiz hattı ve yerel SEO odaklı hızlı platform.",
-    badges: [
-      "Canlı Hurda Fiyat Hesaplayıcı",
-      "WhatsApp Hızlı Değerleme",
-      "Bölgesel Bursa SEO",
-      "Hızlı İletişim",
-    ],
-    liveUrl: "/bursacagdashurda",
-    ctaLabel: "Canlı Siteyi İncele",
-    accentColor: "#10b981",
-    metric: "Anlık Fiyat Hesaplama • Bursa Geneli",
-  },
-  {
     id: "corentia",
     title: "Corentia — Otonom WhatsApp Yapay Zekâ Satış Asistanı",
     client: "Rodi Medya Ürünü",

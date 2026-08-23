@@ -42,6 +42,7 @@ gsap.registerPlugin(ScrollTrigger);
  * ana sayfaya gidip sonra ilgili bölüme kaydırıyor.
  */
 const NAV = [
+  { href: "/sitelerimiz", label: "Sitelerimiz" },
   { href: "/#hizmetler", label: "Hizmetler" },
   { href: "/#isler", label: "İşler" },
   { href: "/#surec", label: "Süreç" },

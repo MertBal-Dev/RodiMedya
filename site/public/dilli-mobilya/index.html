@@ -10,15 +10,17 @@
   <meta property="og:title" content="Dilli Mobilya | Bursa Exclusive Showrooms & Düğün Paketleri">
   <meta property="og:description" content="Bursa genelinde 9 şubemizle peşinatsız elden senetle taksit, düğün paketleri ve lüks mobilya koleksiyonları.">
   <meta property="og:image" content="https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80">
-  <!-- Sekme ikonu. Göreli yol: sayfa /dilli-mobilya/ altında servis
-       ediliyor, bu yüzden kök eğik çizgi kullanılmıyor. -->
-  <link rel="icon" type="image/jpeg" href="logo.jpg">
-  <link rel="apple-touch-icon" href="logo.jpg">
+  <!-- ⚠️ Varlık yolları MUTLAK olmalı.
+       Sayfa hem /dilli-mobilya hem /dilli-mobilya/index.html
+       adreslerinden açılabiliyor. Göreli yazıldığında ilkinde tarayıcı
+       kökten arıyor (/css/styles.css) ve CSS/JS hiç yüklenmiyor. -->
+  <link rel="icon" type="image/jpeg" href="/dilli-mobilya/logo.jpg">
+  <link rel="apple-touch-icon" href="/dilli-mobilya/logo.jpg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="/dilli-mobilya/css/styles.css">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -385,8 +387,8 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/data.js"></script>
-  <script src="js/app.js"></script>
+  <script src="/dilli-mobilya/js/data.js"></script>
+  <script src="/dilli-mobilya/js/app.js"></script>
   <script>
     function toggleMobileDrawer() {
       const drawer = document.getElementById('mobileNavDrawer');

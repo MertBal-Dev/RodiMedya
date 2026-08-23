@@ -2425,3 +2425,124 @@ img {
 
 /* Hide old toast styles */
 .live-toast-notification { display: none !important; }
+
+/* =========================================================================
+   MOBİL TAŞMA DÜZELTMESİ
+   =========================================================================
+
+   Belirti: telefonda sayfa küçülmüş görünüyordu; 390px'lik ekranda
+   düzen viewport'u 505px'e genişliyor ve tarayıcı her şeyi sığdırmak
+   için uzaklaştırıyordu.
+
+   Sebep — flexbox `min-width: auto` tuzağı:
+
+   `.pres-modal-card` ve `.modal-dialog-box` doğru yazılmıştı
+   (`width: 100%; max-width: 580px`). Ancak ikisi de flex öğesi ve flex
+   öğelerinin varsayılan `min-width` değeri `auto`'dur: öğe, içeriğinin
+   **min-content** genişliğinin altına inemez. `max-width` bu sınırı
+   aşamaz.
+
+   İçerideki `.btn-lux` ise `white-space: nowrap` taşıyordu; "Tasarımı &
+   Sistemi İncele" gibi uzun bir etiket bölünemeyen ~455px'lik bir blok
+   oluşturuyor, o da kartı, kart da viewport'u itiyordu.
+
+   Çözüm iki parça — biri tek başına yetmiyor:
+     1. Kartların küçülebilmesi için `min-width: 0`
+     2. Dar ekranda buton etiketinin satır atlayabilmesi
+   ========================================================================= */
+
+.pres-modal-card,
+.modal-dialog-box {
+  min-width: 0;
+}
+
+@media (max-width: 560px) {
+  /* Buton metni artık sarabilir; tek satıra sığdırma zorunluluğu
+     kalktığı için min-content genişliği ekrana uyuyor. */
+  .btn-lux {
+    white-space: normal;
+  }
+
+  /* Modal kenar boşlukları dar ekranda içerik alanını daraltıyordu. */
+  .pres-modal-backdrop {
+    padding: 1rem;
+  }
+
+  .pres-header {
+    padding: 1.25rem 1.25rem;
+  }
+}
+
+/* --- Navbar ---------------------------------------------------------
+   `.nav-links` mobilde zaten gizleniyordu, sorun orada değildi:
+   marka bloğu (250px) ve aksiyon grubu (215px) birlikte 481px tutuyor
+   ve ikisi de `flex-shrink: 0` taşıyordu. 390px'lik ekranda navbar
+   viewport'u itiyordu.
+
+   Marka bloğu artık daralabiliyor; sığmazsa metin üç noktayla
+   kısalıyor. Logo ve telefon butonu sabit kalıyor — onlar işlevsel,
+   marka yazısı ise tekrar bilgi (logoda zaten yazıyor). */
+@media (max-width: 560px) {
+  .nav-container {
+    gap: 0.5rem;
+  }
+
+  .brand-identity {
+    flex-shrink: 1;
+    min-width: 0;
+  }
+
+  .brand-identity > * {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* --- Hero: dar ekranda metin kesiliyordu ----------------------------
+   `1fr` track'i aslında `minmax(auto, 1fr)` demek ve `auto` alt sınırı
+   `min-content`'tir: ızgara sütunu içeriğinin en dar hâlinden daha
+   fazla küçülemez. `.hero-metrics` (3 sütun) bu yüzden 360px'lik
+   ekranda ~375px'e kilitleniyor, `.container`'ı ve tüm hero metnini
+   dışarı itiyordu. `overflow-x: hidden` bunu gizliyordu — yani metin
+   görünmüyordu, sadece taşma görünmüyordu.
+
+   `minmax(0, 1fr)` alt sınırı kaldırıyor. Bu, CSS Grid'de taşmanın
+   en sık sebebidir ve en sık gözden kaçanıdır. */
+@media (max-width: 560px) {
+  .hero-grid {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .hero-grid > *,
+  .hero-metrics > * {
+    min-width: 0;
+  }
+
+  .hero-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .metric-card h3 {
+    font-size: 1.5rem;
+  }
+
+  /* Rozet tek satıra sığmıyordu; sarmasına izin veriliyor. */
+  .hero-tagline {
+    white-space: normal;
+    text-align: left;
+  }
+}
+
+/* Son emniyet: beklenmedik bir öğe taşarsa sayfa yatay kaymak yerine
+   kırpsın. Düzen viewport'unun genişlemesini kesin olarak engeller.
+   ⚠️ Bu bir çözüm değil, ağ. Taşmanın kendisi yukarıda çözülmeli —
+   aksi halde içerik sessizce kırpılır ve kimse fark etmez. */
+@media (max-width: 768px) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+}

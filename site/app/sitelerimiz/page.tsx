@@ -10,7 +10,7 @@ import { SITE } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Geliştirdiğimiz Siteler & Canlı Projeler — Rodi Medya",
   description:
-    "Rodi Medya tarafından geliştirilen dijital showroomlar, interaktif web platformları ve satış odaklı web siteleri.",
+    "Rodi Medya tarafından geliştirilen dijital showroomlar ve satış odaklı web siteleri. Canlı ortamda incelenebilir.",
   alternates: { canonical: "/sitelerimiz" },
   openGraph: {
     type: "website",
@@ -21,165 +21,227 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * Portfolyo — **web projeleri**.
+ *
+ * ⚠️ Corentia bu listede yok: o bir web sitesi değil, WhatsApp
+ * üzerinden çalışan bir yapay zekâ asistanı. "Geliştirdiğimiz siteler"
+ * başlığı altında durması yanlış olur. Kendi sayfası var: /corentia
+ */
 const PROJECTS = [
   {
     id: "dilli-mobilya",
-    title: "Dilli Mobilya — Dijital Showroom & Düğün Paketi Platformu",
+    name: "Dilli Mobilya",
+    kicker: "Dijital showroom & düğün paketi platformu",
     client: "Dilli Mobilya Ltd. Şti.",
-    sector: "Mobilya, Çeyiz & Perakende (Bursa)",
+    sector: "Mobilya, çeyiz ve perakende — Bursa",
     summary:
-      "Bursa'nın 25 yıllık güvenilir markası için tasarlanan; müşterinin kendi salonunu ve çeyiz paketini görsel olarak oluşturup 16 ay elden taksit tutarını anında hesaplayabildiği lüks dijital showroom.",
-    badges: [
-      "16 Ay Elden Taksit Motoru",
-      "Fotoğraflı Düğün Paketi Tasarlayıcı",
-      "9 Şube Google Harita Navigasyonu",
-      "1 Tıkla WhatsApp Sipariş",
-      "Tam Ekran HD Lightbox",
+      "Bursa'nın 25 yıllık markası için tasarlanan dijital showroom. Müşteri kendi salonunu ve çeyiz paketini görsel olarak kuruyor, 16 ay elden taksit tutarını anında görüyor, tek dokunuşla WhatsApp'tan sipariş veriyor.",
+    features: [
+      "16 ay elden taksit motoru",
+      "Fotoğraflı düğün paketi tasarlayıcı",
+      "9 şube, Google Harita navigasyonu",
+      "Tek tıkla WhatsApp sipariş",
+      "Tam ekran HD ürün görüntüleyici",
     ],
-    liveUrl: "/dilli-mobilya",
-    ctaLabel: "Canlı Demoyu İncele",
-    accentColor: "#c98836",
-    metric: "16 Ay Elden Taksit • 9 Showroom",
+    metrics: [
+      { value: "9", label: "showroom" },
+      { value: "16", label: "ay taksit" },
+      { value: "25", label: "yıllık marka" },
+    ],
+    href: "/dilli-mobilya",
+    cta: "Canlı siteyi aç",
   },
   {
-    id: "corentia",
-    title: "Corentia — Otonom WhatsApp Yapay Zekâ Satış Asistanı",
-    client: "Rodi Medya Ürünü",
-    sector: "Yapay Zekâ, Emlak & Turizm",
+    id: "forge-house",
+    name: "Forge House",
+    kicker: "Spor salonu sitesi, yönetim paneli ve mobil uygulama",
+    client: "GymOS — spor salonu dijital sistemi",
+    sector: "Spor salonu ve fitness — Bursa Nilüfer",
     summary:
-      "Emlak ofisleri, oteller ve hizmet işletmeleri için WhatsApp üzerinden gelen müşteri taleplerini 7/24 karşılayan, portföy sunup satış randevusu bağlayan otonom yapay zekâ motoru.",
-    badges: [
-      "7/24 Otonom Satış Asistanı",
-      "Doğal Dil Anlama (NLP)",
-      "CRM & Takvim Entegrasyonu",
-      "Anında Randevu Bağlama",
+      "Salonun tanıtım sitesi, işletmenin yönettiği panel ve üyenin telefonundaki uygulama; üçü birbirine bağlı. Panelden yazılan antrenman programı üyenin telefonuna anında düşüyor, üyenin verdiği bar siparişi resepsiyonun ekranında beliriyor.",
+    features: [
+      "Canlı salon doluluğu",
+      "Grup dersi rezervasyonu ve bekleme listesi",
+      "Supplement bar — uygulamadan sipariş",
+      "Antrenman programı ve hareket videoları",
+      "İşletme paneli: program, ürün, üye, ders",
+      "Dijital üye kartı",
     ],
-    liveUrl: "/corentia",
-    ctaLabel: "Ürün Sayfasını İncele",
-    accentColor: "#2563eb",
-    metric: "%85 Daha Hızlı Dönüşüm",
+    metrics: [
+      { value: "21", label: "uygulama ekranı" },
+      { value: "9", label: "panel sayfası" },
+      { value: "3", label: "bağlı parça" },
+    ],
+    href: "/fitness",
+    cta: "Siteyi aç",
+    secondary: { href: "/fitness/admin", label: "Yönetim panelini aç" },
   },
 ];
 
 export default function SitelerimizPage() {
   return (
-    <ScrollEngine>
+    <>
+      {/* Bu ikisi sarmalayıcı değil — sayfaya bir kez mount edilen,
+          null döndüren sürücüler. Animasyon `data-anim` ile veriliyor. */}
+      <ScrollEngine />
+      <Reveal />
       <Header />
+
       <main id="ana-icerik">
-        {/* HERO SECTION */}
-        <SectionSurface tone="amber" className="pt-36 pb-20 md:pt-44 md:pb-28">
-          <div className="container mx-auto px-4 md:px-8 max-w-5xl">
-            <Reveal>
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-ink/10 border border-ink/15 text-xs font-bold uppercase tracking-wider text-ink mb-6">
-                <span>✦</span>
-                <span>RODİ MEDYA PORTFOLYO</span>
-              </div>
-            </Reveal>
+        {/* --- HERO ---------------------------------------------------- */}
+        <SectionSurface
+          tone="ink"
+          image="/img/bg/10-gecis.jpg"
+          scrim={0.42}
+          priority
+        >
+          <div className="shell flex min-h-[78svh] flex-col justify-center pt-32 pb-20">
+            <p className="t-label mb-7 opacity-60" data-anim="rise">
+              Portfolyo
+            </p>
 
-            <Reveal delay={0.1}>
-              <h1 className="text-4xl md:text-6xl lg:text-7xl font-display font-extrabold tracking-tight text-ink leading-[1.08] mb-6">
-                Geliştirdiğimiz <br />
-                <span className="text-magenta">Canlı Projeler</span> & Showroomlar
-              </h1>
-            </Reveal>
+            <h1
+              className="t-display m-0 max-w-[16ch] text-[clamp(2.4rem,7vw,5.5rem)]"
+              data-anim="rise"
+              data-anim-delay="0.08"
+            >
+              Geliştirdiğimiz canlı projeler
+            </h1>
 
-            <Reveal delay={0.2}>
-              <p className="text-lg md:text-xl text-ink/80 max-w-2xl font-body leading-relaxed">
-                İşletmelerin vitrinini dijitale taşıyan, sadece şık görünmekle kalmayıp doğrudan WhatsApp ve şube üzerinden satış kapatan canlı web projelerimiz.
-              </p>
-            </Reveal>
+            <p
+              className="t-lede mt-8 max-w-[52ch] opacity-75"
+              data-anim="rise"
+              data-anim-delay="0.16"
+            >
+              İşletmenin vitrinini dijitale taşıyan, şık görünmekle
+              kalmayıp doğrudan WhatsApp ve şube üzerinden satış kapatan
+              siteler. Hepsi canlı ortamda, gerçek müşteriyle çalışıyor.
+            </p>
           </div>
         </SectionSurface>
 
-        {/* PROJECTS SHOWCASE LIST */}
-        <SectionSurface tone="ink" className="py-24 md:py-32">
-          <div className="container mx-auto px-4 md:px-8 max-w-5xl">
-            <div className="flex flex-col gap-16 md:gap-20">
-              {PROJECTS.map((project, idx) => (
-                <Reveal key={project.id} delay={idx * 0.1}>
-                  <div className="rounded-3xl bg-ink-soft/90 border border-white/10 p-8 md:p-12 hover:border-amber/40 transition-all duration-300 shadow-2xl relative overflow-hidden group">
-                    <div
-                      className="absolute top-0 right-0 w-96 h-96 rounded-full blur-3xl opacity-10 pointer-events-none transition-opacity duration-500 group-hover:opacity-25"
-                      style={{ backgroundColor: project.accentColor }}
-                    />
+        {/* --- PROJE ---------------------------------------------------- */}
+        <section className="surface-ink section-pad">
+          <div className="shell">
+            {PROJECTS.map((p) => (
+              <article key={p.id} className="border-t border-white/12 pt-12">
+                <div
+                  className="flex flex-wrap items-baseline justify-between gap-x-8 gap-y-3"
+                  data-anim="rise"
+                >
+                  <h2 className="t-display m-0 text-[clamp(1.9rem,4.6vw,3.6rem)]">
+                    {p.name}
+                  </h2>
+                  <p className="t-label m-0 opacity-55">{p.sector}</p>
+                </div>
 
-                    <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-                      <span className="text-xs font-bold uppercase tracking-widest text-amber px-3 py-1 rounded-full bg-white/5 border border-white/10">
-                        {project.sector}
-                      </span>
-                      <span className="text-xs text-white/50 font-mono">
-                        {project.metric}
-                      </span>
-                    </div>
+                <p
+                  className="t-lede mt-4 max-w-[46ch] opacity-80"
+                  data-anim="rise"
+                  data-anim-delay="0.06"
+                >
+                  {p.kicker}
+                </p>
 
-                    <h2 className="text-2xl md:text-4xl font-display font-bold text-white mb-4 leading-tight">
-                      {project.title}
-                    </h2>
+                {/* Ölçüler — projenin büyüklüğünü tek bakışta veriyor. */}
+                <ul
+                  className="m-0 mt-12 grid list-none gap-8 p-0 sm:grid-cols-3"
+                  data-anim="rise"
+                  data-anim-delay="0.1"
+                >
+                  {p.metrics.map((m) => (
+                    <li key={m.label}>
+                      <p className="t-display m-0 text-[clamp(2.2rem,5vw,3.4rem)] leading-none">
+                        {m.value}
+                      </p>
+                      <p className="t-label mt-2 opacity-55">{m.label}</p>
+                    </li>
+                  ))}
+                </ul>
 
-                    <p className="text-white/75 text-base md:text-lg font-body leading-relaxed mb-8 max-w-3xl">
-                      {project.summary}
-                    </p>
+                <p
+                  className="t-body mt-12 max-w-[58ch] opacity-70"
+                  data-anim="rise"
+                >
+                  {p.summary}
+                </p>
 
-                    <div className="flex flex-wrap gap-2 md:gap-3 mb-10">
-                      {project.badges.map((badge, bIdx) => (
-                        <span
-                          key={bIdx}
-                          className="text-xs md:text-sm px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white/90 font-medium"
-                        >
-                          ✓ {badge}
-                        </span>
-                      ))}
-                    </div>
+                <h3 className="t-label mt-14 mb-8 opacity-55">
+                  Sitede neler var
+                </h3>
+                <ul className="m-0 grid list-none gap-x-10 gap-y-8 p-0 sm:grid-cols-2 lg:grid-cols-3">
+                  {p.features.map((f, i) => (
+                    <li
+                      key={f}
+                      data-anim="rise"
+                      data-anim-delay={((i % 3) * 0.07).toFixed(2)}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="mb-4 block h-[3px] w-9 rounded-full bg-amber"
+                      />
+                      <p className="t-body m-0 opacity-80">{f}</p>
+                    </li>
+                  ))}
+                </ul>
 
-                    <div className="flex flex-wrap items-center gap-4">
-                      <a
-                        href={project.liveUrl}
-                        target={project.liveUrl.startsWith("http") ? "_blank" : undefined}
-                        className="inline-flex items-center gap-3 px-6 py-3.5 rounded-full bg-amber text-ink font-bold text-sm md:text-base hover:bg-amber-lit transition-colors duration-200 shadow-lg shadow-amber/20 group-hover:scale-105 transform"
-                      >
-                        <span>{project.ctaLabel}</span>
-                        <span className="text-lg">→</span>
-                      </a>
-                      <span className="text-xs text-white/40">
-                        Canlı ortamda test edilebilir
-                      </span>
-                    </div>
-                  </div>
-                </Reveal>
-              ))}
-            </div>
+                <div className="mt-14 flex flex-wrap gap-4" data-anim="rise">
+                  <Link href={p.href} className="btn-solid">
+                    {p.cta}
+                  </Link>
+                  {"secondary" in p && p.secondary && (
+                    <Link href={p.secondary.href} className="btn-outline">
+                      {p.secondary.label}
+                    </Link>
+                  )}
+                </div>
+              </article>
+            ))}
           </div>
-        </SectionSurface>
+        </section>
 
-        {/* BOTTOM CTA */}
-        <SectionSurface tone="cream" className="py-20 md:py-28 text-center">
-          <div className="container mx-auto px-4 max-w-3xl">
-            <Reveal>
-              <h2 className="text-3xl md:text-5xl font-display font-extrabold text-ink mb-6">
-                Sizin İşletmeniz İçin de <br />
-                <span className="text-magenta">Böyle Bir Web Sitesi</span> Yapalım mı?
-              </h2>
-            </Reveal>
-            <Reveal delay={0.1}>
-              <p className="text-base md:text-lg text-ink/75 font-body mb-8">
-                İşletmenizin ürünlerini, fiyatlarını ve şube bilgilerini doğrudan müşteriye ulaştıran satış odaklı tasarımlar hazırlıyoruz.
-              </p>
-            </Reveal>
-            <Reveal delay={0.2}>
+        {/* --- KAPANIŞ -------------------------------------------------- */}
+        <SectionSurface tone="cream" image="/img/doku/31-krem-kagit.jpg" scrim={0.1}>
+          <div className="shell section-pad">
+            <h2
+              className="t-display m-0 max-w-[20ch] text-[clamp(1.9rem,4.6vw,3.4rem)]"
+              data-anim="rise"
+            >
+              Sizin işletmeniz için de böyle bir site yapalım
+            </h2>
+
+            <p
+              className="t-lede mt-6 max-w-[50ch] opacity-75"
+              data-anim="rise"
+              data-anim-delay="0.08"
+            >
+              Ürünlerinizi, fiyatlarınızı ve şube bilgilerinizi doğrudan
+              müşteriye ulaştıran, satış kapatan tasarımlar hazırlıyoruz.
+            </p>
+
+            <div
+              className="mt-10 flex flex-wrap gap-4"
+              data-anim="rise"
+              data-anim-delay="0.14"
+            >
               <a
                 href={SITE.whatsapp}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-3 px-8 py-4 rounded-full bg-ink text-amber font-display font-bold text-base hover:bg-ink-warm transition-all duration-200 shadow-xl shadow-ink/20"
+                className="btn-solid"
               >
-                <span>WhatsApp ile Proje Başlatın</span>
-                <span>💬</span>
+                WhatsApp'tan yazın
               </a>
-            </Reveal>
+              <Link href="/#iletisim" className="btn-outline">
+                İletişim
+              </Link>
+            </div>
           </div>
         </SectionSurface>
       </main>
+
       <Footer />
-    </ScrollEngine>
+    </>
   );
 }

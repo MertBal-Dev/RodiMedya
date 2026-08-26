@@ -19,6 +19,11 @@ const nextConfig: NextConfig = {
       // Dilli Mobilya — düz HTML/CSS/JS
       { source: "/dilli-mobilya", destination: "/dilli-mobilya/index.html" },
 
+      // Bursa Kozalak Anaokulu — tasarım demosu (düz HTML/CSS/JS).
+      // Dosya içi bağlantılar `/kozalak-demo/...` mutlak yolla yazıldığı için
+      // sadece kök isteğin index.html'e yönlenmesi yeterli.
+      { source: "/kozalak-demo", destination: "/kozalak-demo/index.html" },
+
       // Forge House / GymOS — statik dışa aktarılmış Next uygulaması.
       // fitness-web `output: "export"` + `basePath: "/fitness"` ile
       // derlenip `public/fitness/` içine kopyalanıyor.

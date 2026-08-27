@@ -24,6 +24,9 @@ const nextConfig: NextConfig = {
       // sadece kök isteğin index.html'e yönlenmesi yeterli.
       { source: "/kozalak-demo", destination: "/kozalak-demo/index.html" },
 
+      // Anaokulu web sitesi demosu (genel / white-label).
+      { source: "/anaokulu-demo", destination: "/anaokulu-demo/index.html" },
+
       // Forge House / GymOS — statik dışa aktarılmış Next uygulaması.
       // fitness-web `output: "export"` + `basePath: "/fitness"` ile
       // derlenip `public/fitness/` içine kopyalanıyor.

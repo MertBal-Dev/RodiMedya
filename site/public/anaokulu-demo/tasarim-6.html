@@ -60,6 +60,11 @@ a{color:inherit}
 p{margin:0}
 h1,h2,h3,h4{margin:0;font-family:var(--disp);font-weight:600;line-height:1.16;letter-spacing:-.01em}
 :focus-visible{outline:3px solid var(--c1);outline-offset:3px;border-radius:6px}
+/* WCAG 2.4.1 Bypass Blocks — klavye/ekran okuyucu kullanıcısı menüyü atlayabilsin.
+   Normalde ekran dışında; yalnızca odaklanınca görünür. */
+.atla{position:absolute;left:-9999px;top:0;z-index:2000;background:var(--ink);color:var(--surface);
+  padding:14px 20px;border-radius:0 0 10px 0;font-weight:700;text-decoration:none}
+.atla:focus{left:0}
 .kap{max-width:var(--kap);margin:0 auto;padding:0 26px}
 .bolum{padding:96px 0;position:relative;overflow:hidden}
 .krem{background:var(--bg)}
@@ -162,7 +167,7 @@ h1,h2,h3,h4{margin:0;font-family:var(--disp);font-weight:600;line-height:1.16;le
 /* ── İKİ KART (rehberlik / işleyiş) ─────────────────────── */
 .ikiKart{display:grid;grid-template-columns:1fr 1fr;gap:26px}
 .kk{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:34px}
-.kk h4{font-size:22px;margin-bottom:12px}
+.kk h3{font-size:22px;margin-bottom:12px}
 .kk p{color:var(--muted);font-size:16px;margin-bottom:16px}
 .kk ul{list-style:none;padding:0;margin:0 0 18px;display:flex;flex-direction:column;gap:9px;
   font-size:15.5px;color:var(--muted)}
@@ -218,7 +223,7 @@ h1,h2,h3,h4{margin:0;font-family:var(--disp);font-weight:600;line-height:1.16;le
 .alt a{color:rgba(255,255,255,.76);text-decoration:none}
 .alt a:hover{color:#fff}
 .altIzgara{display:grid;grid-template-columns:1.5fr 1fr 1fr 1.3fr;gap:40px;padding-bottom:38px}
-.alt h4{font-size:15.5px;margin:0 0 16px;color:#fff}
+.alt h3{font-size:15.5px;margin:0 0 16px;color:#fff}
 .alt ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px;font-size:15px}
 .altLogo{background:#fff;border-radius:14px;padding:7px;display:inline-flex;margin-bottom:14px}
 .altLogo [data-logo]{height:54px;display:flex;align-items:center}
@@ -290,6 +295,9 @@ footer a,.bilgi a,.bilgi li a,.ust a,.alt ul a,.altBilgi ul a,.altSag ul a,
 </head>
 
 <body data-tasarim-no="6">
+<!-- WCAG 2.4.1 Bypass Blocks -->
+<a class="atla" href="#main">İçeriğe geç</a>
+
 
 <header class="bar">
   <div class="kap">
@@ -319,6 +327,7 @@ footer a,.bilgi a,.bilgi li a,.ust a,.alt ul a,.altBilgi ul a,.altSag ul a,
   <a class="btn btn-c1" href="#iletisim">Ön kayıt</a>
 </div>
 
+<main id="main">
 <!-- HERO -->
 <section class="hero" id="tepe">
   <svg class="sus" style="width:220px;top:40px;left:-40px" viewBox="0 0 120 240" fill="none"
@@ -480,7 +489,7 @@ footer a,.bilgi a,.bilgi li a,.ust a,.alt ul a,.altBilgi ul a,.altSag ul a,
     </div>
     <div class="ikiKart">
       <article class="kk" data-a="kart">
-        <h4>Rehberlik Hizmetleri</h4>
+        <h3>Rehberlik Hizmetleri</h3>
         <p>Rehber öğretmenimiz haftada bir kez sınıfları gözlemler, gerektiğinde veliyle
            birebir görüşme planlar.</p>
         <ul>
@@ -492,7 +501,7 @@ footer a,.bilgi a,.bilgi li a,.ust a,.alt ul a,.altBilgi ul a,.altSag ul a,
         <a class="btn" href="#iletisim">Detaylı Bilgi</a>
       </article>
       <article class="kk" data-a="kart">
-        <h4>Okul İşleyişi</h4>
+        <h3>Okul İşleyişi</h3>
         <p>Gün her sabah aynı akışla başlar; çocuklar ne olacağını bildiğinde kendini
            daha güvende hisseder.</p>
         <ul>
@@ -598,6 +607,8 @@ footer a,.bilgi a,.bilgi li a,.ust a,.alt ul a,.altBilgi ul a,.altSag ul a,
   </div>
 </section>
 
+
+</main>
 <footer class="alt">
   <div class="kap">
     <div class="altIzgara">
@@ -605,13 +616,13 @@ footer a,.bilgi a,.bilgi li a,.ust a,.alt ul a,.altBilgi ul a,.altSag ul a,
         <span class="altLogo"><span data-logo></span></span>
         <p>Her çocuğun içinde keşfedilmeyi bekleyen bir yetenek olduğuna inanıyoruz.</p>
       </div>
-      <div><h4>Sayfalar</h4><ul>
+      <div><h3>Sayfalar</h3><ul>
         <li><a href="#hakkimizda">Hakkımızda</a></li><li><a href="#egitim">Eğitim Programımız</a></li>
         <li><a href="#okulumuz">Okulumuz</a></li><li><a href="#galeri">Galeri</a></li></ul></div>
-      <div><h4>Kurumsal</h4><ul>
+      <div><h3>Kurumsal</h3><ul>
         <li><a href="#rehberlik">Rehberlik</a></li><li><a href="#rehberlik">Okul İşleyişi</a></li>
         <li><a href="#iletisim">İletişim</a></li></ul></div>
-      <div><h4>İletişim</h4>
+      <div><h3>İletişim</h3>
         <ul>
           <li class="iletSatir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/>

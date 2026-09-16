@@ -60,6 +60,11 @@ a{color:inherit}
 p{margin:0}
 h1,h2,h3{margin:0;font-family:var(--disp);font-weight:400;line-height:1.14}
 :focus-visible{outline:3px solid var(--c1);outline-offset:3px;border-radius:8px}
+/* WCAG 2.4.1 Bypass Blocks — klavye/ekran okuyucu kullanıcısı menüyü atlayabilsin.
+   Normalde ekran dışında; yalnızca odaklanınca görünür. */
+.atla{position:absolute;left:-9999px;top:0;z-index:2000;background:var(--ink);color:var(--surface);
+  padding:14px 20px;border-radius:0 0 10px 0;font-weight:700;text-decoration:none}
+.atla:focus{left:0}
 .kap{max-width:var(--kap);margin:0 auto;padding:0 24px;position:relative;z-index:2}
 .bolum{padding:92px 0;position:relative;overflow:hidden}
 .bas{text-align:center;max-width:640px;margin:0 auto 50px}
@@ -305,6 +310,9 @@ footer a,.bilgi a,.bilgi li a,.ust a,.alt ul a,.altBilgi ul a,.altSag ul a,
 </head>
 
 <body data-tasarim-no="3">
+<!-- WCAG 2.4.1 Bypass Blocks -->
+<a class="atla" href="#main">İçeriğe geç</a>
+
 
 <header class="kapsul">
   <div class="kapsul-ic">
@@ -332,6 +340,7 @@ footer a,.bilgi a,.bilgi li a,.ust a,.alt ul a,.altBilgi ul a,.altSag ul a,
   <a class="btn btn-1" href="#iletisim">Ön kayıt</a>
 </div>
 
+<main id="main">
 <!-- HERO -->
 <section class="hero" id="tepe">
   <span class="leke" data-yuz aria-hidden="true"
@@ -586,6 +595,8 @@ footer a,.bilgi a,.bilgi li a,.ust a,.alt ul a,.altBilgi ul a,.altSag ul a,
   </div>
 </section>
 
+
+</main>
 <!-- FOOTER -->
 <svg class="dalga" viewBox="0 0 1440 76" preserveAspectRatio="none" aria-hidden="true">
   <path d="M0 40c200-30 420-36 620-14s420 44 620 18 200-26 200-26v58H0Z" fill="var(--surface)"/>

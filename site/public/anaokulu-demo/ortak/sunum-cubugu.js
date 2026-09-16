@@ -65,8 +65,8 @@
       line:'#EDE6D9', onC1:'#FFFFFF', onC3:'#261E1A', onC4:'#261E1A' }
   ];
 
-  var WA_NUMARA = '905446012418';
-  var WA_GOSTER = '+90 544 601 24 18';
+  var WA_NUMARA = '905458620773';
+  var WA_GOSTER = '+90 545 862 07 73';
 
   /* Aynı alan adında birden fazla demo olduğu için anahtarlar ayrık tutulur. */
   var A_PALET = 'anaokulu_palet', A_KAPALI = 'anaokulu_cubuk_kapali',

@@ -113,7 +113,13 @@ h1,h2,h3{margin:0;font-weight:700;line-height:1.02;letter-spacing:-.03em}
 .yirtik{position:absolute;left:0;right:0;bottom:-1px;width:100%;height:38px;color:var(--bg)}
 
 /* polaroid kolaj */
-.kolaj{position:relative;height:400px;overflow:hidden}
+/* Yükseklik ölçümle bulundu, göz kararıyla değil. Polaroid 203px sabit
+   yükseklikte ve eğik olduğu için tarayıcıda ölçülen ilişki şu:
+     üst sıra başlığının altı = 0,04·H + 219
+     alt sıra kutusunun üstü  = H − 242
+   Çakışmaması için H > 491 olmalı. 480px'te pay −0,4px çıkıyordu
+   (kutular birebir değiyor); 510px ≈19px pay bırakıyor. */
+.kolaj{position:relative;height:510px;overflow:hidden}
 .pol{position:absolute;background:var(--surface);border:var(--k) solid var(--ink);
   padding:9px 9px 32px;box-shadow:6px 7px 0 rgba(0,0,0,.24);width:180px}
 .pol img{aspect-ratio:1/1;object-fit:cover;width:100%}
@@ -123,8 +129,11 @@ h1,h2,h3{margin:0;font-weight:700;line-height:1.02;letter-spacing:-.03em}
   width:58px;height:20px;background:rgba(255,255,255,.6);border:1px solid rgba(0,0,0,.16)}
 .pol:nth-child(1){left:0;top:4%;transform:rotate(-8deg)}
 .pol:nth-child(2){left:33%;top:-2%;transform:rotate(5deg);z-index:2}
-.pol:nth-child(3){left:14%;top:50%;transform:rotate(7deg)}
-.pol:nth-child(4){left:50%;top:46%;transform:rotate(-6deg)}
+/* Alt sıra ÜSTTEN değil ALTTAN sabit: yüzdeli top değeri kapsayıcı
+   yüksekliğine bağlı olduğu için her kırılımda taşıyordu. Alttan
+   sabitlenince taşma yapısal olarak imkânsız. */
+.pol:nth-child(3){left:14%;bottom:12px;transform:rotate(7deg)}
+.pol:nth-child(4){left:50%;bottom:34px;transform:rotate(-6deg)}
 .puan{position:absolute;right:2%;top:38%;width:104px;height:104px;border-radius:50%;
   background:var(--surface);border:var(--k) solid var(--ink);display:flex;flex-direction:column;
   align-items:center;justify-content:center;font-weight:700;line-height:1.05;
@@ -201,7 +210,13 @@ h1,h2,h3{margin:0;font-weight:700;line-height:1.02;letter-spacing:-.03em}
   border:13px solid transparent;border-top-color:var(--ink);border-bottom:0}
 .balon p{font-weight:600;font-size:18px;line-height:1.42;margin:10px 0 14px}
 .balon footer{font-size:14px;color:var(--muted);font-weight:600}
-.yildiz{color:var(--c4);letter-spacing:2px;font-size:16px}
+.yildiz{color:var(--c4);letter-spacing:2px;font-size:24px}
+/* ── Kontrast düzeltmesi (WCAG 2.2 AA / 1.4.3) ────────────
+   Palet değerlerine dokunulmadı; yalnızca --c5 zeminli bölümlerdeki
+   açıklama metninin rengi değişti. --muted, dokuz paletin sekizinde
+   --c5 üzerinde 4.5:1'in altında kalıyordu (2.07–4.90); --ink ile
+   dokuzunda da geçiyor (4.79–10.75). */
+section[style*="--c5"] .bas p{color:var(--ink)}
 
 /* ── CTA + FORM ─────────────────────────────────────────── */
 .cta{background:var(--c3);color:var(--on-c3);border-top:var(--k) solid var(--ink);
@@ -227,6 +242,15 @@ h1,h2,h3{margin:0;font-weight:700;line-height:1.02;letter-spacing:-.03em}
 .onay input{width:20px;height:20px;flex:none;margin-top:2px;accent-color:var(--c1)}
 .form .btn{width:100%}
 
+/* ── KONUM / HARİTA ─────────────────────────────────────── */
+.konum{background:var(--surface);border-bottom:var(--k) solid var(--ink)}
+.harita{overflow:hidden}
+.harita iframe{display:block;width:100%;height:430px;border:0;
+  border-bottom:var(--k) solid var(--ink)}
+.haritaAlt{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
+  gap:18px;padding:20px 24px;background:var(--surface)}
+.haritaAlt span{font-weight:700;font-size:15.5px}
+
 /* ── FOOTER: açık zemin + dev şerit ─────────────────────── */
 .alt{background:var(--bg);padding:0 0 26px}
 .altSerit{background:var(--c1);color:var(--on-c1);border-bottom:var(--k) solid var(--ink);
@@ -238,7 +262,7 @@ h1,h2,h3{margin:0;font-weight:700;line-height:1.02;letter-spacing:-.03em}
 .altCta p{color:var(--muted);font-size:17px;max-width:46ch;margin:0 auto 26px}
 .altBilgi{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;
   border-top:var(--k) solid var(--ink);padding-top:34px;margin-top:34px}
-.altBilgi h4{font-size:13px;text-transform:uppercase;letter-spacing:.12em;margin:0 0 12px;
+.altBilgi h3{font-size:13px;text-transform:uppercase;letter-spacing:.12em;margin:0 0 12px;
   color:var(--muted)}
 .altBilgi ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;
   font-size:15px;font-weight:600}
@@ -250,7 +274,10 @@ h1,h2,h3{margin:0;font-weight:700;line-height:1.02;letter-spacing:-.03em}
 /* ── DUYARLI ────────────────────────────────────────────── */
 @media (max-width:1040px){
   .hero .kap,.cta .kap{grid-template-columns:1fr}
-  .kolaj{order:-1;height:330px}
+  /* Yükseklik taban değerde (510px) kalıyor — polaroidler bu aralıkta
+     küçülmediği için kolajı kısaltmak üst sıranın başlığını örtüyordu
+     (eski 330px, referanstaki 420px de yetmiyor). Sadece sıra değişir. */
+  .kolaj{order:-1}
   .uclu,.yaslar,.galeri{grid-template-columns:repeat(2,1fr)}
   .bar .kap{grid-template-columns:auto 1fr auto}
   .bar nav{display:none}
@@ -259,16 +286,50 @@ h1,h2,h3{margin:0;font-weight:700;line-height:1.02;letter-spacing:-.03em}
   .marka{align-items:flex-start}
   .altBilgi{grid-template-columns:1fr}
 }
+/* NOT — 641–1040px'te .uclu 3 kartı 2 sütunda 2+1 "yetim satır"
+   bırakıyor. Referanstaki çözüm (son kartı grid-column:1/-1 ile tam
+   genişliğe almak) burada UYGULANMADI: bu tasarımın felsefe kartları
+   görsel içeriyor ve aspect-ratio yüzünden son kartın görseli 1024px'te
+   348px yerine 719px'e çıkıyordu. Yetim satır, dev kartdan iyi. */
 @media (max-width:640px){
   body{font-size:16px}
   .bolum{padding:58px 0}
   :root{--g:5px;--k:2.5px}
   .uclu,.yaslar,.galeri,.ikili{grid-template-columns:1fr}
-  .kolaj{height:300px}
-  .pol{width:132px;padding:7px 7px 26px}
-  .puan{width:82px;height:82px;right:0;top:auto;bottom:0}
-  .puan b{font-size:22px}
+  /* MOBİL KOLAJ — mutlak konumlandırma yerine ızgara.
+     Masaüstündeki saçılmış yerleşim burada polaroidleri üst üste
+     bindirip ALT BAŞLIKLARI kesiyordu. Izgara + hafif eğim ile
+     örtüşme yapısal olarak imkânsız; bantlı kenar (.pol::before)
+     kolaj hissini korumaya devam ediyor. */
+  .kolaj{position:static;height:auto;overflow:visible;
+    display:grid;grid-template-columns:1fr 1fr;gap:22px 20px;padding:10px 6px 4px}
+  /* margin:0 şart — .pol bir <figure> ve tarayıcı varsayılanı
+     figure{margin:1em 40px}. Mutlak konumlandırmadayken etkisizdi,
+     ızgaraya alınca 40px sol ofset olarak kartları taşırıyordu. */
+  .pol{position:relative;width:100%;margin:0;padding:7px 7px 30px}
+  .pol span{bottom:8px;left:7px;right:7px;font-size:11.5px}
+  /* Temel CSS'teki .pol:nth-child(n){left:33%…} kuralları yukarıdaki
+     .pol kuralından daha yüksek özgüllükte olduğu için yüzdeli left
+     değerleri ızgara konumunun üstüne ofset olarak biniyordu.
+     Aynı özgüllükte sıfırlanıyor. Eğim ±2,5° tutuldu: 20px boşlukta
+     döndürülmüş kutu komşusuna değmiyor, başlıklar bir daha örtülemez.
+     !important ZORUNLU: giriş animasyonu her .pol'e kendi inline
+     transform'unu yazıyor (rotate(-8deg) vb.) ve inline stil CSS'i ezer.
+     Onsuz, masaüstünden mobile yeniden boyutlandırmada (ekran döndürme)
+     kutular 8°'lik açılarını koruyup 20px boşlukta tekrar örtüşüyor. */
+  .pol:nth-child(1){left:auto;right:auto;top:auto;bottom:auto;transform:rotate(-2.5deg)!important}
+  .pol:nth-child(2){left:auto;right:auto;top:auto;bottom:auto;transform:rotate(2deg)!important}
+  .pol:nth-child(3){left:auto;right:auto;top:auto;bottom:auto;transform:rotate(2.5deg)!important}
+  .pol:nth-child(4){left:auto;right:auto;top:auto;bottom:auto;transform:rotate(-2deg)!important}
+  /* 4,8 rozeti gizlenmiyor — ızgarada kendi satırına alınıyor,
+     böylece hiçbir başlığın üstüne düşmüyor. */
+  .puan{position:static;grid-column:1 / -1;justify-self:center;
+    width:88px;height:88px;margin-top:4px}
+  .puan b{font-size:24px}
   .altSerit .serit-ic span{font-size:24px}
+  .harita iframe{height:300px}
+  .haritaAlt{flex-direction:column;align-items:stretch;text-align:center;padding:18px}
+  .haritaAlt .btn{width:100%}
 }
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
@@ -343,7 +404,7 @@ footer a,.bilgi a,.bilgi li a,.ust a,.alt ul a,.altBilgi ul a,.altSag ul a,
     </nav>
     <a class="marka" href="#tepe"><span data-logo></span><b>Örnek Anaokulu</b></a>
     <nav class="sag" aria-label="Sağ menü">
-      <a href="#gunumuz">Günümüz</a><a href="#galeri">Galeri</a><a href="#iletisim">İletişim</a>
+      <a href="#gunumuz">Günümüz</a><a href="#galeri">Galeri</a><a href="#iletisim">İletişim</a><a href="#konum">Konum</a>
     </nav>
     <span class="bosluk"></span>
     <button class="acBtn" type="button" id="acBtn" aria-label="Menüyü aç" aria-expanded="false">
@@ -360,6 +421,7 @@ footer a,.bilgi a,.bilgi li a,.ust a,.alt ul a,.altBilgi ul a,.altSag ul a,
   </button>
   <a href="#felsefe">Felsefe</a><a href="#egitim">Eğitim</a><a href="#yas">Yaş</a>
   <a href="#gunumuz">Günümüz</a><a href="#galeri">Galeri</a><a href="#iletisim">İletişim</a>
+  <a href="#konum">Konum</a>
   <a class="btn btn-1" href="#iletisim">Ön kayıt</a>
 </div>
 
@@ -376,7 +438,7 @@ footer a,.bilgi a,.bilgi li a,.ust a,.alt ul a,.altBilgi ul a,.altSag ul a,
          çizmelerimiz çamurlu, aklımız meraklı.</p>
       <div class="hero-btn">
         <a class="btn btn-3" href="#iletisim">Okulu gezmek istiyorum</a>
-        <a class="btn" href="https://wa.me/905446012418" target="_blank" rel="noopener">WhatsApp</a>
+        <a class="btn" href="https://wa.me/905458620773" target="_blank" rel="noopener">WhatsApp</a>
       </div>
     </div>
     <div class="kolaj">
@@ -587,6 +649,30 @@ footer a,.bilgi a,.bilgi li a,.ust a,.alt ul a,.altBilgi ul a,.altSag ul a,
   </div>
 </section>
 
+<!-- KONUM -->
+<!-- Harita yer tutucudur: demo kurgusal bir okul olduğu için gerçek bir
+     adres gömülmedi, şehir görünümü kullanıldı. Yayına alırken iframe'in
+     ve "Yol tarifi al" linkinin q= / destination= parametresine okulun
+     gerçek adresi yazılır; başka bir şey değişmez. -->
+<section class="bolum konum" id="konum">
+  <div class="kap">
+    <div class="bas" data-a="blok"><span class="et">Konum</span>
+      <h2>Bizi bulmak kolay</h2>
+      <p>Okulunuzun konumu haritada burada görünür. "Yol tarifi al" düğmesi
+        ziyaretçiyi doğrudan telefonundaki navigasyona götürür.</p></div>
+    <div class="harita kutu" data-a="blok">
+      <iframe title="Okulun konumunu gösteren harita (demoda örnek şehir görünümü)"
+        src="https://maps.google.com/maps?q=Bursa%2C%20T%C3%BCrkiye&amp;z=12&amp;output=embed"
+        loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+      <div class="haritaAlt">
+        <span>Hafta içi 07:45 – 18:00 · Randevu için arayabilirsiniz</span>
+        <a class="btn btn-1" target="_blank" rel="noopener"
+          href="https://www.google.com/maps/dir/?api=1&amp;destination=Bursa%2C%20T%C3%BCrkiye">Yol tarifi al</a>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- FOOTER -->
 <footer class="alt">
   <div class="altSerit" aria-hidden="true">
@@ -602,15 +688,15 @@ footer a,.bilgi a,.bilgi li a,.ust a,.alt ul a,.altBilgi ul a,.altSag ul a,
   </div>
   <div class="kap">
     <div class="altBilgi">
-      <div><h4>Okul</h4><ul>
+      <div><h3>Okul</h3><ul>
         <li><a href="#felsefe">Felsefe</a></li><li><a href="#egitim">Eğitim</a></li>
         <li><a href="#yas">Yaş grupları</a></li><li><a href="#branslar">Branşlar</a></li></ul></div>
-      <div><h4>Günlük</h4><ul>
+      <div><h3>Günlük</h3><ul>
         <li><a href="#gunumuz">Bir günümüz</a></li><li><a href="#galeri">Galeri</a></li>
-        <li><a href="#iletisim">Ön kayıt</a></li></ul></div>
-      <div><h4>İletişim</h4><ul>
+        <li><a href="#iletisim">Ön kayıt</a></li><li><a href="#konum">Konum</a></li></ul></div>
+      <div><h3>İletişim</h3><ul>
         <li><a href="tel:+900000000000">0XXX XXX XX XX</a></li>
-        <li><a href="https://wa.me/905446012418" target="_blank" rel="noopener">WhatsApp</a></li>
+        <li><a href="https://wa.me/905458620773" target="_blank" rel="noopener">WhatsApp</a></li>
         <li><a href="https://instagram.com/" target="_blank" rel="noopener">Instagram</a></li></ul></div>
     </div>
     <div class="altSon">
@@ -638,7 +724,7 @@ document.getElementById('kayitFormu').addEventListener('submit',function(e){
   var m='Merhaba, ön kayıt hakkında bilgi almak istiyorum.\n\nVeli: '+f.get('ad')+
         '\nTelefon: '+f.get('tel')+'\nÇocuğun yaşı: '+f.get('yas')+
         (f.get('not')?'\nNot: '+f.get('not'):'');
-  window.open('https://wa.me/905446012418?text='+encodeURIComponent(m),'_blank','noopener');
+  window.open('https://wa.me/905458620773?text='+encodeURIComponent(m),'_blank','noopener');
 });
 
 (function(){
